@@ -48,7 +48,8 @@ export default function DashboardPage() {
                     throw new Error('데이터를 불러오는데 실패했습니다.');
                 }
                 const data = await response.json();
-                setAllData(data);
+                const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+                setAllData(items);
             } catch (error) {
                 console.error("Error fetching dashboard data:", error);
             } finally {

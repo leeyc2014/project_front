@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const subMenus: { [key: string]: { name: string; href: string }[] } = {
     dashboard: [
       { name: '종합 현황', href: '/dashboard' },
-      { name: '실시간 감시', href: '#' },
+      { name: '실시간 감시', href: '/dashboard/dashboard2' },
       { name: '위험 이력 분석', href: '#' },
     ],
     report: [

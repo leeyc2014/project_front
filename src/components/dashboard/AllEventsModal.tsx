@@ -3,6 +3,18 @@
 import { useMemo, useState, useEffect } from 'react';
 import type { RiskItem } from '@/types/dashboard'; // 중앙 타입 정의 import
 
+interface AllEventsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    allData: RiskItem[];
+    filter: string;
+    setFilter: (filter: any) => void;
+    searchTerm: string;
+    setSearchTerm: (term: string) => void;
+    // 이 부분의 타입을 정확히 지정해줍니다.
+    openDetail: (item: RiskItem) => void; 
+}
+
 // --- Pagination Component ---
 const Pagination = ({ currentPage, totalPages, onPageChange, onBlockChange }: {
     currentPage: number;
@@ -153,8 +165,8 @@ export function AllEventsModal({
                             </tr>
                         </thead>
                         <tbody className="divide-y text-xs">
-                            {paginatedList.map((item) => (
-                                <tr key={item.id} className="hover:bg-blue-50/50 transition-colors">
+                            {paginatedList.filter((item) => item != null).map((item, index) => (
+                                <tr key={item.id ?? `event-${index}`} className="hover:bg-blue-50/50 transition-colors">
                                     <td className="p-4 font-bold text-blue-600 font-mono tracking-tighter">{item.epcCode}</td>
                                     <td className="p-4">{item.operatorId}</td>
                                     <td className="p-4 text-gray-500">{item.deviceId}</td>
