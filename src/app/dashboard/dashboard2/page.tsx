@@ -1,9 +1,9 @@
 ﻿"use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useLayoutEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import SerialList from '@/components/dashboard2/SerialList';
-import type { RouteData } from '@/components/dashboard2/LogisticsMap';
+import type { RouteData, TrackingPoint } from '@/components/dashboard2/LogisticsMap';
 import { RiskItem } from '@/types/dashboard';
 import ApexCharts from 'apexcharts';
 
@@ -78,7 +78,7 @@ const baseChartOptions: ApexCharts.ApexOptions = {
   },
   tooltip: {
     theme: 'dark',
-    custom: function({ seriesIndex, dataPointIndex, w }) {
+    custom: function ({ seriesIndex, dataPointIndex, w }) {
       const data = w.globals.initialSeries[seriesIndex]?.data?.[dataPointIndex];
       const time = data?.x != null ? new Date(data.x).toLocaleString() : '';
       const value = data?.y ?? w.globals.series?.[seriesIndex]?.[dataPointIndex] ?? '-';
@@ -103,7 +103,17 @@ export default function Dashboard2Page() {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [activeSerial, setActiveSerial] = useState<string | null>(null);
   const [lastSelectedSerial, setLastSelectedSerial] = useState<string | null>(null);
-  const [sequenceTab, setSequenceTab] = useState<'OPERATOR' | 'DEVICE'>('OPERATOR');
+  const [resetToken, setResetToken] = useState(0);
+  const [mapPadding, setMapPadding] = useState<{ top: number; bottom: number; left: number; right: number }>({
+    top: 24,
+    bottom: 24,
+    left: 24,
+    right: 24,
+  });
+  const mapWrapRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const bottomChartsRef = useRef<HTMLDivElement>(null);
   const [locationCoords, setLocationCoords] = useState<Record<string, { lat: number; lon: number }>>({});
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
   const hasBackend = Boolean(backendBaseUrl);
@@ -222,10 +232,12 @@ export default function Dashboard2Page() {
         for (let i = 1; i < lines.length; i++) {
           const [locationId, scanLocation, lat, lon] = lines[i].split(',');
           const name = safe(scanLocation);
+          const id = safe(locationId);
           const latNum = Number.parseFloat(lat);
           const lonNum = Number.parseFloat(lon);
           if (!name || Number.isNaN(latNum) || Number.isNaN(lonNum)) continue;
           map[name] = { lat: latNum, lon: lonNum };
+          if (id) map[id] = { lat: latNum, lon: lonNum };
         }
         setLocationCoords(map);
       } catch (error) {
@@ -383,6 +395,30 @@ export default function Dashboard2Page() {
     }
   }, [activeSerial]);
 
+  useLayoutEffect(() => {
+    const computePadding = () => {
+      const mapRect = mapWrapRef.current?.getBoundingClientRect();
+      if (!mapRect) return;
+
+      const leftRect = leftPanelRef.current?.getBoundingClientRect();
+      const rightRect = rightPanelRef.current?.getBoundingClientRect();
+      const bottomRect = bottomChartsRef.current?.getBoundingClientRect();
+
+      const left = leftRect ? Math.max(0, leftRect.right - mapRect.left) + 16 : 24;
+      const right = rightRect ? Math.max(0, mapRect.right - rightRect.left) + 16 : 24;
+      const bottom = bottomRect ? Math.max(0, mapRect.bottom - bottomRect.top) + 16 : 24;
+      const top = 24;
+
+      setMapPadding({ top, bottom, left, right });
+    };
+
+    computePadding();
+    const handle = () => computePadding();
+    window.addEventListener('resize', handle);
+
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+
   const selectedEvents = useMemo(() => {
     const serial = lastSelectedSerial;
     if (!serial) return [];
@@ -412,52 +448,8 @@ export default function Dashboard2Page() {
     return { series, options };
   }, [filteredEvents]);
 
-  const operatorDeviceCountChartData = useMemo(() => {
-    const isOperator = sequenceTab === 'OPERATOR';
-    const minorThreshold = 10000;
-    const map = new Map<string, Set<string>>();
-    filteredEvents.forEach((event) => {
-      const id = safe(isOperator ? event.operatorId : event.deviceId);
-      const epc = safe(event.epcCode);
-      if (!id || !epc) return;
-      if (!map.has(id)) map.set(id, new Set());
-      map.get(id)?.add(epc);
-    });
-    const entries = Array.from(map.entries()).map(([id, set]) => ({
-      id,
-      count: set.size,
-    }));
-    let categories: string[] = [];
-    let counts: number[] = [];
-    const shouldGroup = entries.length > 20;
-    if (shouldGroup) {
-      const majors = entries.filter((entry) => entry.count > minorThreshold).sort((a, b) => a.id.localeCompare(b.id));
-      const minors = entries.filter((entry) => entry.count <= minorThreshold);
-      const minorSum = minors.reduce((acc, entry) => acc + entry.count, 0);
-      categories = majors.map((entry) => entry.id);
-      counts = majors.map((entry) => entry.count);
-      if (minorSum > 0) {
-        categories.push('기타');
-        counts.push(minorSum);
-      }
-    } else {
-      categories = entries.map((entry) => entry.id).sort();
-      counts = categories.map((id) => map.get(id)?.size || 0);
-    }
-    const series = [{ name: isOperator ? 'Operator Count' : 'Device Count', data: counts }];
-    const options: ApexCharts.ApexOptions = {
-      ...baseChartOptions,
-      chart: { ...baseChartOptions.chart, type: 'bar' },
-      colors: [isOperator ? CHART_COLORS.red : CHART_COLORS.purple],
-      plotOptions: { bar: { borderRadius: 6, columnWidth: '60%' } },
-      xaxis: { categories, labels: { rotate: -45, trim: true } },
-      yaxis: { title: { text: 'EPC Count' } },
-      tooltip: { theme: 'dark' },
-    };
-    return { series, options };
-  }, [filteredEvents, sequenceTab, filters]);
 
-  const swappedTimelineChartData = useMemo(() => {
+  const eventTimelineChartData = useMemo(() => {
     if (selectedEvents.length === 0) return { series: [], options: {} };
     const categories: string[] = [];
     const points: number[] = [];
@@ -487,7 +479,7 @@ export default function Dashboard2Page() {
           hideOverlappingLabels: false,
           showDuplicates: true,
           trim: false,
-          maxHeight: 100,
+          maxHeight: 90,
           style: { fontSize: '8px' },
           offsetY: 2,
         },
@@ -515,67 +507,13 @@ export default function Dashboard2Page() {
     return { series, options };
   }, [selectedEvents]);
 
-  const speedChartData = useMemo(() => {
-    if (selectedEvents.length < 2) return { series: [], options: {} };
-    const labels: string[] = [];
-    const speeds: number[] = [];
-
-    const toRadians = (deg: number) => (deg * Math.PI) / 180;
-    const haversineKm = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => {
-      const R = 6371;
-      const dLat = toRadians(b.lat - a.lat);
-      const dLon = toRadians(b.lon - a.lon);
-      const lat1 = toRadians(a.lat);
-      const lat2 = toRadians(b.lat);
-      const h =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-      return 2 * R * Math.asin(Math.sqrt(h));
-    };
-
-    for (let i = 1; i < selectedEvents.length; i++) {
-      const prev = selectedEvents[i - 1];
-      const curr = selectedEvents[i];
-      const prevLoc = safe(prev.scanLocation);
-      const currLoc = safe(curr.scanLocation);
-      if (!prevLoc || !currLoc) continue;
-      if (prevLoc === currLoc) continue;
-      const prevType = normalizeEventType(prev.eventType);
-      const currType = normalizeEventType(curr.eventType);
-      const prevCoord = locationCoords[prevLoc];
-      const currCoord = locationCoords[currLoc];
-      if (!prevCoord || !currCoord) continue;
-      const prevTime = toDateMs(prev.eventTime);
-      const currTime = toDateMs(curr.eventTime);
-      if (prevTime == null || currTime == null) continue;
-      const hours = (currTime - prevTime) / 36e5;
-      if (hours <= 0) continue;
-      const distanceKm = haversineKm(prevCoord, currCoord);
-      const speed = distanceKm / hours;
-      labels.push(currLoc);
-      speeds.push(Number.isFinite(speed) ? speed : 0);
-    }
-
-    const series = [{ name: 'Speed (km/h)', data: speeds }];
-    const options: ApexCharts.ApexOptions = {
-      ...baseChartOptions,
-      chart: { ...baseChartOptions.chart, type: 'bar' },
-      colors: [CHART_COLORS.orange],
-      plotOptions: { bar: { borderRadius: 6, columnWidth: '60%' } },
-      xaxis: {
-        categories: labels,
-        labels: {
-          show: true,
-          rotate: 0,
-          trim: true,
-          style: { fontSize: '10px' },
-        },
-      },
-      yaxis: { title: { text: 'km/h' }, labels: { formatter: (val: number) => val.toFixed(2) } },
-      tooltip: { theme: 'dark', y: { formatter: (val: number) => `${val.toFixed(2)} km/h` } },
-    };
-    return { series, options };
-  }, [selectedEvents, locationCoords]);
+  const kpiCards = [
+    { label: '복제 EPC 판별', value: '92%', color: 'text-red-500' },
+    { label: '불가능 이동 판별', value: '89%', color: 'text-red-500' },
+    { label: '경로 이탈 판별', value: '76%', color: 'text-orange-500' },
+    { label: '가품 EPC 판별', value: '95%', color: 'text-orange-500' },
+    { label: '라이프사이클 위반', value: '68%', color: 'text-yellow-500' },
+  ];
 
   const filteredEpcs = useMemo(() => {
     const set = new Set<string>();
@@ -585,6 +523,25 @@ export default function Dashboard2Page() {
     });
     return Array.from(set);
   }, [filteredEvents]);
+
+  const trackingPath = useMemo(() => {
+    if (selectedEvents.length === 0) return null;
+    const points: TrackingPoint[] = [];
+    let fallbackTime = 0;
+    selectedEvents.forEach((event) => {
+      const loc = safe(event.scanLocation);
+      const id = safe(event.locationId);
+      const coord = locationCoords[loc] || locationCoords[id];
+      const t = toDateMs(event.eventTime);
+      if (!coord) return;
+      const timeValue = t == null ? fallbackTime : t;
+      const label = loc || id || 'UNKNOWN';
+      points.push({ coords: [coord.lon, coord.lat], t: timeValue, label });
+      fallbackTime += 1000;
+    });
+    points.sort((a, b) => a.t - b.t);
+    return points.length > 1 ? points : null;
+  }, [selectedEvents, locationCoords]);
 
   const epcFilter = activeSerial
     ? [activeSerial]
@@ -598,44 +555,30 @@ export default function Dashboard2Page() {
 
   return (
     <>
-      <div className="relative h-full w-full overflow-hidden bg-gray-100">
+      <div className="relative h-full w-full overflow-hidden bg-gray-100" ref={mapWrapRef}>
         <div className="absolute inset-0 rounded-lg overflow-hidden">
-          <LogisticsMap epcFilter={epcFilter} routes={backendRoutes.length > 0 ? backendRoutes : undefined} />
+          <LogisticsMap
+            epcFilter={epcFilter}
+            routes={backendRoutes.length > 0 ? backendRoutes : undefined}
+            trackingPath={trackingPath}
+            resetToken={resetToken}
+            viewportPadding={mapPadding}
+          />
         </div>
 
-        <div className="relative z-10 h-full p-4 pointer-events-none">
-          <div className="h-full grid grid-cols-1 lg:grid-cols-[minmax(280px,360px)_1fr_minmax(320px,380px)] grid-rows-[minmax(0,1fr)_minmax(180px,260px)] gap-4">
-            <div className="h-full lg:row-span-2 pointer-events-auto">
-              <div className="h-full grid grid-rows-2 gap-4">
-                <Section title="AGGREGATION BY FACTORY">
-                  {isLoading || filteredEvents.length === 0 ? renderChartPlaceholder("No data for selected filters.") : (
-                    <Chart options={aggregationFactoryChartData.options} series={aggregationFactoryChartData.series} type="bar" height="100%" />
-                  )}
-                </Section>
-
-                <Section
-                  title="OPERATOR / DEVICE COUNT"
-                  headerRight={
-                    <div className="flex items-center space-x-2 text-xs font-bold">
-                      <button
-                        className={`px-3 py-1.5 rounded-lg transition-all ${sequenceTab === 'OPERATOR' ? 'bg-gray-800 text-white shadow-md' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-                        onClick={() => setSequenceTab('OPERATOR')}
-                      >
-                        Operator
-                      </button>
-                      <button
-                        className={`px-3 py-1.5 rounded-lg transition-all ${sequenceTab === 'DEVICE' ? 'bg-gray-800 text-white shadow-md' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-                        onClick={() => setSequenceTab('DEVICE')}
-                      >
-                        Device
-                      </button>
-                    </div>
-                  }
-                >
-                  {isLoading || filteredEvents.length === 0 ? renderChartPlaceholder("No data for selected filters.") : (
-                    <Chart options={operatorDeviceCountChartData.options} series={operatorDeviceCountChartData.series} type="bar" height="100%" />
-                  )}
-                </Section>
+        <div className="relative z-10 h-full p-2 pointer-events-none">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-[minmax(260px,320px)_1fr_minmax(300px,360px)] grid-rows-[minmax(0,1fr)_minmax(180px,260px)] gap-3">
+            <div className="h-full lg:row-span-2 pointer-events-auto" ref={leftPanelRef}>
+              <div className="h-full grid grid-rows-5 gap-4">
+                {kpiCards.map((card) => (
+                  <div
+                    key={card.label}
+                    className="flex items-center justify-between bg-white/90 border border-gray-200 shadow-lg rounded-2xl px-4 py-3"
+                  >
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{card.label}</span>
+                    <span className={`text-2xl font-black ${card.color}`}>{card.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -682,29 +625,33 @@ export default function Dashboard2Page() {
                           : '날짜 없음'}
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="h-full lg:row-span-2 pointer-events-auto">
-              <Section
-                title="SERIAL LIST"
-                headerRight={
-                  <div className="flex items-center space-x-3">
-                    <div className="flex flex items-end gap-3">
+                    <div className='flex items-center justify-end pt-0.5'>
                       <button
                         type="button"
-                        className="text-[10px] font-bold text-gray-500 hover:text-gray-800 disabled:opacity-50"
+                        className="text-[10px] font-bold text-gray-500 hover:text-red-500 disabled:opacity-50"
                         onClick={() => {
                           setActiveSerial(null);
                           setLastSelectedSerial(null);
+                          setResetToken((prev) => prev + 1);
                         }}
                         disabled={!activeSerial && !lastSelectedSerial}
                       >
                         RESET MAP
                       </button>
-                      <span className="text-sm font-bold text-blue-600">TOTAL {serials.length}</span>                     
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-full lg:row-span-2 pointer-events-auto" ref={rightPanelRef}>
+              <Section
+                title="SERIAL LIST"
+                headerRight={
+                  <div className="flex items-center space-x-3">
+                    <div className="flex flex items-end gap-3">
+                      <span className="text-sm font-bold text-blue-600">TOTAL {serials.length}</span>
+
                     </div>
                     <button
                       className="px-2.5 py-1.5 text-xs font-bold rounded-lg text-gray-800 transition-all cursor-pointer"
@@ -734,17 +681,17 @@ export default function Dashboard2Page() {
               </Section>
             </div>
 
-            <div className="lg:col-start-2 lg:row-start-2 min-h-0 pointer-events-auto">
+            <div className="lg:col-start-2 lg:row-start-2 min-h-0 pointer-events-auto" ref={bottomChartsRef}>
               <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <Section title="EVENT TIMELINE" contentClassName="pt-3">
                   {isLoading || selectedEvents.length === 0 ? renderChartPlaceholder("Select a serial to view timeline.") : (
-                    <Chart options={swappedTimelineChartData.options} series={swappedTimelineChartData.series} type="line" height="100%" />
+                    <Chart options={eventTimelineChartData.options} series={eventTimelineChartData.series} type="line" height="100%" />
                   )}
                 </Section>
 
-                <Section title="SPEED BY LOCATION">
-                  {isLoading || selectedEvents.length === 0 ? renderChartPlaceholder("Select a serial to view speed.") : (
-                    <Chart options={speedChartData.options} series={speedChartData.series} type="bar" height="100%" />
+                <Section title="AGGREGATION BY FACTORY">
+                  {isLoading || filteredEvents.length === 0 ? renderChartPlaceholder("No data for selected filters.") : (
+                    <Chart options={aggregationFactoryChartData.options} series={aggregationFactoryChartData.series} type="bar" height="100%" />
                   )}
                 </Section>
               </div>
@@ -880,55 +827,7 @@ export default function Dashboard2Page() {
                 </div>
               </details>
 
-              <details className="rounded-xl border border-gray-200 bg-white" open>
-                <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-gray-600 uppercase tracking-wider">Event Time</summary>
-                <div className="p-3 space-y-3">
-                  <label className="block text-xs font-semibold text-gray-600">
-                    시작일
-                    <input
-                      type="date"
-                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs"
-                      min={filterOptions.eventTime.min || undefined}
-                      max={filters.eventTimeEnd || filterOptions.eventTime.max || undefined}
-                      value={filters.eventTimeStart}
-                      onChange={(e) => setFilterValue('eventTimeStart', e.target.value)}
-                    />
-                  </label>
-                  <label className="block text-xs font-semibold text-gray-600">
-                    종료일
-                    <input
-                      type="date"
-                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs"
-                      min={filters.eventTimeStart || filterOptions.eventTime.min || undefined}
-                      max={filterOptions.eventTime.max || undefined}
-                      value={filters.eventTimeEnd}
-                      onChange={(e) => setFilterValue('eventTimeEnd', e.target.value)}
-                    />
-                  </label>
-                  <div className="flex items-center justify-between">
-                    <button
-                      type="button"
-                      className="text-[11px] font-bold text-gray-500 hover:text-gray-800"
-                      onClick={() => {
-                        setFilterValue('eventTimeStart', filterOptions.eventTime.defaultStart || '');
-                        setFilterValue('eventTimeEnd', filterOptions.eventTime.defaultEnd || '');
-                      }}
-                    >
-                      기본값 적용
-                    </button>
-                    <button
-                      type="button"
-                      className="text-[11px] font-bold text-gray-500 hover:text-gray-800"
-                      onClick={() => {
-                        setFilterValue('eventTimeStart', '');
-                        setFilterValue('eventTimeEnd', '');
-                      }}
-                    >
-                      초기화
-                    </button>
-                  </div>
-                </div>
-              </details>
+
 
               <details className="rounded-xl border border-gray-200 bg-white">
                 <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-gray-600 uppercase tracking-wider">Manufacture Date</summary>

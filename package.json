@@ -9,11 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.0.38",
+    "@deck.gl/layers": "^9.0.38",
+    "@deck.gl/mapbox": "^9.0.38",
+    "@deck.gl/geo-layers": "^9.0.38",
     "@tanstack/react-virtual": "^3.13.18",
     "apexcharts": "^5.3.6",
     "jotai": "^2.16.2",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
+    "maplibre-gl": "^4.7.1",
     "next": "16.1.4",
     "react": "19.2.3",
     "react-apexcharts": "^1.9.0",

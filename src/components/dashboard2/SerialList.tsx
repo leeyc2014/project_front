@@ -19,6 +19,7 @@ const SerialList: React.FC<SerialListProps> = ({
   onSerialToggle,
 }) => {
   const [page, setPage] = useState(1);
+  const [category, setCategory] = useState<'ALL' | 'SAFE' | 'CAUTION' | 'DANGER'>('ALL');
 
   const totalPages = Math.max(1, Math.ceil(serials.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -50,9 +51,27 @@ const SerialList: React.FC<SerialListProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      <h2 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3">
-        Serial List
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-black text-gray-500 uppercase tracking-widest">
+          Serial List
+        </h2>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-full p-0.5">
+          {(['ALL', 'SAFE', 'CAUTION', 'DANGER'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setCategory(key)}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-full transition-colors ${
+                category === key
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="flex-1 overflow-y-auto space-y-2">
         {pagedSerials.map((serial) => {
           const isOpen = activeSerial === serial;
@@ -66,7 +85,7 @@ const SerialList: React.FC<SerialListProps> = ({
                   isOpen ? 'bg-blue-50' : 'bg-gray-50 hover:bg-gray-100'
                 }`}
               >
-                <span className="text-xs font-bold text-gray-800">{serial}</span>
+                <span className="text-[11px] font-bold text-gray-800">{serial}</span>
               </button>
 
               {isOpen && (

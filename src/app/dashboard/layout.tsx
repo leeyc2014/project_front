@@ -39,6 +39,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } else if (pathname === "/dashboard") {
       setSelectedMenu("dashboard");
       setSelectedSubMenu("종합 현황");
+    } else if (pathname.includes("/dashboard/dashboard2")) {
+      setSelectedMenu("dashboard");
+      setSelectedSubMenu("실시간 감시");
     }
   }, [pathname]); // pathname이 변할 때마다 즉각 실행
 
@@ -71,19 +74,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">TEST</h1>
             <nav className="flex space-x-8 h-16">
               {['dashboard', 'report'].map((menuKey) => (
-                <button
-                  key={menuKey}
-                  onMouseEnter={() => setHoveredMenu(menuKey)}
-                  onClick={() => {
-                    // 메인 메뉴 클릭 시 해당 카테고리의 첫 번째 서브메뉴로 이동하게 설정 가능
-                    setSelectedMenu(menuKey);
-                  }}
-                  className={`flex items-center font-bold px-1 border-b-2 transition-all ${selectedMenu === menuKey ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-400 hover:text-white'
-                    }`}
-                >
-                  {menuKey === 'dashboard' ? '대시보드' : '진단 리포트'}
-                  <Icon path="M19.5 8.25l-7.5 7.5-7.5-7.5" className={`ml-2 w-3 h-3 transition-transform ${hoveredMenu === menuKey ? 'rotate-180' : ''}`} />
-                </button>
+                <div key={menuKey} className="h-16 flex items-center">
+                  <button
+                    onMouseEnter={() => setHoveredMenu(menuKey)}
+                    onClick={() => {
+                      // 메인 메뉴 클릭 시 해당 카테고리의 첫 번째 서브메뉴로 이동하게 설정 가능
+                      setSelectedMenu(menuKey);
+                    }}
+                    className={`flex items-center font-bold px-1 transition-all ${selectedMenu === menuKey ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-400 hover:text-white'
+                      }`}
+                  >
+                    {menuKey === 'dashboard' ? '대시보드' : '진단 리포트'}
+                    <Icon path="M19.5 8.25l-7.5 7.5-7.5-7.5" className={`ml-2 w-3 h-3 transition-transform ${hoveredMenu === menuKey ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
               ))}
               <Link href="#" className="flex items-center text-gray-400 hover:text-white font-medium px-1">시스템관리</Link>
             </nav>
@@ -99,31 +103,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        {/* SECONDARY TAB (호버 시 드롭다운) */}
+        {/* SECONDARY TAB (전체 영역 노출 + 텍스트만 각 탭 아래 정렬) */}
         <div
-          className={`absolute left-0 w-full bg-gray-800 border-b border-blue-500/30 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out z-10 ${hoveredMenu ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+          className={`absolute left-0 top-full w-full bg-gray-800 border-b border-blue-500/30 shadow-2xl overflow-hidden transition-all duration-200 ease-in-out ${hoveredMenu ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
             }`}
         >
-          <div className="max-w-7xl mx-auto px-8 py-3 flex space-x-10 text-sm">
-            {hoveredMenu && subMenus[hoveredMenu]?.map((sub) => (
-              <Link
-                key={sub.name}
-                href={sub.href}
-                onClick={() => {
-                  setSelectedMenu(hoveredMenu);
-                  setSelectedSubMenu(sub.name);
-                  setHoveredMenu(null);
-                }}
-                className={`transition-all duration-200 relative pb-1 ${selectedSubMenu === sub.name && selectedMenu === hoveredMenu
-                  ? 'text-blue-400 font-black' : 'text-gray-400 hover:text-white'
-                  }`}
-              >
-                {sub.name}
-                {selectedSubMenu === sub.name && selectedMenu === hoveredMenu && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400 rounded-full" />
-                )}
-              </Link>
-            ))}
+          <div className="h-12 flex items-center px-8">
+            <div className="flex items-center space-x-12">
+              <span className="text-xl font-black tracking-tighter text-blue-500 italic uppercase opacity-0 select-none">TEST</span>
+              <div className="flex space-x-8 text-sm">
+                {['dashboard', 'report'].map((menuKey) => (
+                  <div key={menuKey} className="relative">
+                    <span className="invisible font-bold px-1 pointer-events-none relative z-0">
+                      {menuKey === 'dashboard' ? '대시보드' : '진단 리포트'}
+                    </span>
+                    {hoveredMenu === menuKey && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 flex space-x-6 whitespace-nowrap pointer-events-auto z-20">
+                        {subMenus[menuKey]?.map((sub) => (
+                          <Link
+                            key={sub.name}
+                            href={sub.href}
+                            onClick={() => {
+                              setSelectedMenu(menuKey);
+                              setSelectedSubMenu(sub.name);
+                              setHoveredMenu(null);
+                            }}
+                            className={`inline-flex items-center px-2 py-1 rounded transition-all duration-200 relative z-20 pointer-events-auto ${selectedSubMenu === sub.name && selectedMenu === menuKey
+                              ? 'text-blue-400 font-black' : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
+                              }`}
+                          >
+                            {sub.name}
+                            {selectedSubMenu === sub.name && selectedMenu === menuKey && (
+                              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400 rounded-full pointer-events-none" />
+                            )}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </header>

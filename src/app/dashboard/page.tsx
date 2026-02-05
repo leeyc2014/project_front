@@ -2,13 +2,11 @@
 import { useState, useEffect, useMemo } from "react";
 import dynamic from 'next/dynamic';
 import { AllEventsModal } from "@/components/dashboard/AllEventsModal";
-import type { RiskItem } from "@/types/dashboard"; // 중앙 타입 정의 import
+import type { RiskItem } from "@/types/dashboard";
 
-// 차트와 지도는 클라이언트 사이드에서만 렌더링되도록 dynamic import 설정
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 const KakaoMap = dynamic(() => import("@/components/kakaomap"), { ssr: false });
 
-// 공통 섹션 컴포넌트
 const Section = ({ title, children, headerRight }: { title: string, children: React.ReactNode, headerRight?: React.ReactNode }) => (
     <div className="flex flex-col h-full bg-white border border-gray-200 shadow-sm rounded-lg overflow-hidden">
         <div className="h-10 px-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between flex-none">
@@ -19,7 +17,6 @@ const Section = ({ title, children, headerRight }: { title: string, children: Re
     </div>
 );
 
-// 상세 모달 내 데이터 항목 컴포넌트
 const DetailItem = ({ label, value }: { label: string, value: string }) => (
     <div>
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-1">{label}</p>
@@ -28,78 +25,44 @@ const DetailItem = ({ label, value }: { label: string, value: string }) => (
 );
 
 export default function DashboardPage() {
-    // 1. 상태 관리
-    const [allData, setAllData] = useState<RiskItem[]>([]);
+    const [displayData, setDisplayData] = useState<RiskItem[]>([]);
+    const [stats, setStats] = useState({ ALL: 0, SAFE: 0, CAUTION: 0, DANGER: 0 });
     const [filter, setFilter] = useState<'ALL' | 'DANGER' | 'CAUTION' | 'SAFE'>('ALL');
     const [searchTerm, setSearchTerm] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    
     const [selectedItem, setSelectedItem] = useState<RiskItem | null>(null);
     const [isListModalOpen, setIsListModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [allData, setAllData] = useState<RiskItem[]>([]);
     const [mapStartToken, setMapStartToken] = useState(0);
 
-    // 2. 데이터 로드 (API 연동)
+    // [핵심] 서버 API 호출 로직
     useEffect(() => {
-        const fetchDashboardData = async () => {
+        const fetchData = async () => {
             setIsLoading(true);
             try {
-                const response = await fetch('/api/epcis/events');
-                if (!response.ok) {
-                    throw new Error('데이터를 불러오는데 실패했습니다.');
-                }
-                const data = await response.json();
-                const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-                setAllData(items);
+                // 서버에 필터와 검색어를 보내서 필요한 만큼만 가져옴
+                const res = await fetch(`/api/epcis/events?status=${filter}&search=${searchTerm}&limit=50`);
+                const result = await res.json();
+                
+                setDisplayData(result.items); // 화면엔 50개만
+                setStats(result.stats);       // KPI 숫자는 92만 건 기반 통계
             } catch (error) {
-                console.error("Error fetching dashboard data:", error);
+                console.error("Fetch Error:", error);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchDashboardData();
-    }, []);
+        const debounce = setTimeout(fetchData, 300); // 검색 시 타이핑마다 호출 방지
+        return () => clearTimeout(debounce);
+    }, [filter, searchTerm]);
 
-    // 3. KPI 통계 계산
-    const stats = useMemo(() => ({
-        ALL: allData.length,
-        SAFE: allData.filter(d => d.st === 'SAFE').length,
-        CAUTION: allData.filter(d => d.st === 'CAUTION').length,
-        DANGER: allData.filter(d => d.st === 'DANGER').length,
-    }), [allData]);
-
-    // 4. 필터링 및 검색 로직 (AllEventsModal로 이동했으므로 여기선 요약 리스트용으로만 사용)
-    const filteredList = useMemo(() => {
-        return allData.filter(item => {
-            const matchFilter = filter === 'ALL' || item.st === filter;
-            const matchSearch =
-                item.epcCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.scanLocation?.toLowerCase().includes(searchTerm.toLowerCase());
-            return matchFilter && matchSearch;
-        }).sort((a, b) => new Date(b.eventTime).getTime() - new Date(a.eventTime).getTime());
-    }, [allData, filter, searchTerm]);
-
-    // 5. 차트 데이터 (실제 데이터 기반)
-    const chartSeries = useMemo(() => {
-        const base = stats[filter] || 0;
-        return [{
-            name: `${filter} Count`,
-            data: [
-                Math.floor(base * 0.1),
-                Math.floor(base * 0.3),
-                Math.floor(base * 0.2),
-                Math.floor(base * 0.25),
-                Math.floor(base * 0.15)
-            ]
-        }];
-    }, [stats, filter]);
-
-    const openDetail = (item: RiskItem) => {
-        setSelectedItem(item);
-        setMapStartToken(0);
-        setIsDetailModalOpen(true);
-        setIsListModalOpen(false); // 상세 모달 열 때 리스트 모달은 닫기
-    };
+    const chartSeries = useMemo(() => [{
+        name: 'Logistics Vol.',
+        data: [stats.ALL / 5, stats.ALL / 3, stats.ALL / 2, stats.ALL / 4, stats.ALL / 6] // 예시용
+    }], [stats.ALL]);
 
     return (
         <div className="h-full flex flex-col space-y-4">
@@ -109,65 +72,56 @@ export default function DashboardPage() {
                     <button
                         key={type}
                         onClick={() => setFilter(type as any)}
-                        className={`p-4 rounded-xl border transition-all text-left shadow-sm ${filter === type ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'bg-white border-gray-100 hover:border-gray-300'
-                            }`}
+                        className={`p-4 rounded-xl border transition-all text-left shadow-sm ${
+                            filter === type ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'bg-white border-gray-100 hover:border-gray-300'
+                        }`}
                     >
                         <p className="text-[10px] font-black text-gray-400 uppercase mb-1">{type}</p>
-                        <p className={`text-3xl font-black ${type === 'DANGER' ? 'text-red-600' :
-                            type === 'CAUTION' ? 'text-amber-500' :
-                                type === 'SAFE' ? 'text-green-600' : 'text-blue-600'
-                            }`}>
-                            {stats[type as keyof typeof stats] || 0}
+                        <p className={`text-3xl font-black ${
+                            type === 'DANGER' ? 'text-red-600' : type === 'CAUTION' ? 'text-amber-500' : type === 'SAFE' ? 'text-green-600' : 'text-blue-600'
+                        }`}>
+                            {stats[type as keyof typeof stats].toLocaleString()}
                         </p>
                     </button>
                 ))}
             </div>
 
             <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
-                {/* 분석 차트 영역 */}
-                <Section title={`${filter} REAL-TIME TRENDS`}>
-                    {isLoading ? (
-                        <div className="h-full flex items-center justify-center">
-                            <div className="w-full bg-gray-200 rounded-lg p-4 animate-pulse">
-                                <div className="h-48 bg-gray-300 rounded"></div>
-                            </div>
-                        </div>
-                    ) : (
-                        <Chart
-                            options={{
-                                chart: { toolbar: { show: false }, animations: { enabled: true } },
-                                stroke: { curve: 'smooth', width: 3 },
-                                xaxis: { categories: ['12pm', '3pm', '6pm', '9pm', '12am'] },
-                                colors: [filter === 'SAFE' ? '#32CD32' : filter === 'DANGER' ? '#ef4444' : filter === 'CAUTION' ? '#f59e0b' : '#3b82f6'],
-                                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05 } }
-                            }}
-                            series={chartSeries}
-                            type="area"
-                            height="100%"
-                        />
-                    )}
+                <Section title={`${filter} TRENDS (OVERALL)`}>
+                    <Chart
+                        options={{
+                            chart: { toolbar: { show: false } },
+                            stroke: { curve: 'smooth' },
+                            xaxis: { categories: ['12pm', '3pm', '6pm', '9pm', '12am'] },
+                            colors: ['#3b82f6']
+                        }}
+                        series={chartSeries}
+                        type="area"
+                        height="100%"
+                    />
                 </Section>
 
-                {/* 메인 간단 리스트 */}
-                <Section
-                    title={`Recent Logistics Activities`}
+                <Section 
+                    title="Recent Logistics Activities"
                     headerRight={
-                        <button onClick={() => setIsListModalOpen(true)} className="text-[10px] font-bold text-blue-600 hover:underline">
-                            전체보기 ({filteredList.length}) +
+                        <button onClick={() => setIsListModalOpen(true)} className="text-[10px] font-bold text-blue-600">
+                            전체보기 +
                         </button>
                     }
                 >
                     <div className="h-full overflow-y-auto">
                         <table className="w-full text-left text-xs">
                             <tbody className="divide-y">
-                                {filteredList.slice(0, 10).map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50 cursor-pointer group" onClick={() => openDetail(item)}>
+                                {isLoading ? (
+                                    <tr><td className="py-4 text-center text-gray-400">Loading...</td></tr>
+                                ) : displayData.map((item) => (
+                                    <tr key={item.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => {setSelectedItem(item); setIsDetailModalOpen(true);}}>
                                         <td className="py-3 font-bold text-blue-600 font-mono">{item.epcCode}</td>
-                                        <td className="py-3 text-gray-500 truncate max-w-[150px]">{item.scanLocation}</td>
+                                        <td className="py-3 text-gray-500">{item.scanLocation}</td>
                                         <td className="py-3 text-right">
-                                            <span className={`px-2 py-1 rounded-[4px] text-[10px] font-black ${item.st === 'DANGER' ? 'bg-red-100 text-red-600' :
-                                                item.st === 'CAUTION' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
-                                                }`}>{item.st}</span>
+                                            <span className={`px-2 py-1 rounded text-[10px] font-black ${
+                                                item.st === 'DANGER' ? 'bg-red-100 text-red-600' : item.st === 'CAUTION' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
+                                            }`}>{item.st}</span>
                                         </td>
                                     </tr>
                                 ))}
@@ -177,19 +131,15 @@ export default function DashboardPage() {
                 </Section>
             </div>
 
-            {/* [2단계] 가상화된 전체보기 모달 렌더링 */}
-            <AllEventsModal
-                isOpen={isListModalOpen}
-                onClose={() => setIsListModalOpen(false)}
-                allData={allData}
-                filter={filter}
-                setFilter={setFilter}
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                openDetail={openDetail}
+            {/* 모달들은 기존 UI 유지 */}
+            <AllEventsModal 
+                isOpen={isListModalOpen} 
+                onClose={() => setIsListModalOpen(false)} 
+                allData={displayData} // 여기도 페이징이 필요하면 추가 수정 가능
+                filter={filter} setFilter={setFilter}
+                searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+                openDetail={(item) => {setSelectedItem(item); setIsDetailModalOpen(true);}}
             />
-
-            {/* [3단계] 상세 정보 모달 (Full Data & Map) */}
             {isDetailModalOpen && selectedItem && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-20 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="bg-white w-full max-w-6xl h-full rounded-3xl shadow-2xl flex flex-col overflow-hidden">

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getEpcisEvents, setEpcisEvents } from '@/lib/epcisStore';
 
-let epcisEvents: any[] = [];
+
+// 인메모리 저장소 (테스트용)
 
 export async function POST(request: Request) {
     try {
@@ -14,7 +16,7 @@ export async function POST(request: Request) {
         const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
 
         // 서버에서 파싱 (92만건)
-        epcisEvents = lines.slice(1).map((line, index) => {
+        const epcisEvents = lines.slice(1).map((line, index) => {
             const values = line.split(delimiter).map(v => v.trim());
             const getVal = (name: string) => {
                 const idx = headers.indexOf(name.toLowerCase());
@@ -46,25 +48,27 @@ export async function POST(request: Request) {
                 path: [],
                 // ... 필요한 나머지 필드 ...
             };
-
         });
+
+        setEpcisEvents(epcisEvents);
 
         return NextResponse.json({ message: "Success", count: epcisEvents.length });
     } catch (e) { return NextResponse.json({ message: "Error" }, { status: 500 }); }
 }
 
 export async function GET(request: Request) {
+    const epcisEvents = getEpcisEvents();
     const { searchParams } = new URL(request.url);
-    const raw = searchParams.get('raw') || '';
-    if (raw.toLowerCase() === 'true') {
-        return NextResponse.json(epcisEvents);
-    }
-
+    const raw = searchParams.get('raw') === 'true';
     const filterStatus = searchParams.get('status') || 'ALL';
     const search = searchParams.get('search')?.toLowerCase() || "";
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    // 1. 전체 통계 계산 (대용량은 캐시/집계 권장)
+    if (raw) {
+        return NextResponse.json(epcisEvents);
+    }
+
+    // 1. 전체 통계 계산 (92만 건을 매번 돌면 느리므로 실제론 변수에 저장해두는게 좋음)
     const stats = {
         ALL: epcisEvents.length,
         SAFE: epcisEvents.filter(d => d.st === 'SAFE').length,
@@ -79,17 +83,17 @@ export async function GET(request: Request) {
     }
     if (search) {
         filtered = filtered.filter(item => 
-            item.epcCode.toLowerCase().includes(search) || 
-            item.scanLocation.toLowerCase().includes(search)
+            String((item as { epcCode?: unknown }).epcCode ?? "").toLowerCase().includes(search) ||
+            String((item as { scanLocation?: unknown }).scanLocation ?? "").toLowerCase().includes(search)
         );
     }
 
-    // 반환 개수 limit 적용
+    // 최신순 정렬 후 50개만 반환
     const items = filtered.slice(0, limit);
 
     return NextResponse.json({
-        stats,     // KPI 전체 통계
-        items,     // 리스트용 이벤트 데이터
+        stats,     // KPI용 전체 통계
+        items,     // 리스트용 일부 데이터
         filteredCount: filtered.length // 검색 결과 총 개수
     });
 }
