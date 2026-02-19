@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import HeaderUploadWidget from '@/components/dashboard/HeaderUploadWidget';
 
 const Icon = ({ path, className }: { path: string; className: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -18,6 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardHome = pathname === '/dashboard';
+  const dashboardHref = '/dashboard?eventTimeStart=2024-07-25&eventTimeEnd=2024-07-31';
 
   const clearTokenCookie = () => {
     document.cookie = 'token=; Path=/; Max-Age=0; SameSite=Lax';
@@ -36,9 +38,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!payload) return '';
       const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
       const padded = normalized + '==='.slice((normalized.length + 3) % 4);
-      const json = atob(padded);
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+      const json = new TextDecoder().decode(bytes);
       const data = JSON.parse(json);
-      return typeof data?.name === 'string' ? data.name : '';
+
+      const candidates = [
+        data?.name,
+        data?.userName,
+        data?.username,
+        data?.nickname,
+        data?.displayName,
+        data?.id,
+        data?.sub,
+      ];
+      const found = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
+      return typeof found === 'string' ? found : '';
     } catch {
       return '';
     }
@@ -68,7 +83,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const token = getToken();
     const name = token ? decodeJwtName(token) : '';
     setDisplayName(name || '—');
-  }, []);
+  }, [pathname]);
 
   const handleSubMenuClick = (menuKey: string, sub: { name: string; href: string }) => {
     setSelectedMenu(menuKey);
@@ -95,12 +110,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         onMouseLeave={() => setHoveredMenu(null)}
       >
         <div className="h-16 flex items-center justify-between px-8 border-b border-gray-800 relative z-20 bg-gray-900">
-          <div className="flex items-center space-x-12">
+          <div className="flex items-center space-x-12 shrink-0">
             <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">TEST</h1>
             <nav className="flex space-x-8 h-16">
               <div className="h-16 flex items-center">
                 <Link
-                  href="/dashboard"
+                  href={dashboardHref}
                   onClick={() => {
                     setSelectedMenu('dashboard');
                     setHoveredMenu(null);
@@ -135,6 +150,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
               </div>
             </nav>
+          </div>
+          <div className="mx-4 min-w-0 flex-1 flex justify-center">
+            <HeaderUploadWidget />
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right border-r border-gray-700 pr-4">

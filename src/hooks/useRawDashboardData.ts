@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { FilterOptions, RiskItem, FilterState } from '@/types/dashboard';
 
 type LocationItem = {
@@ -22,6 +22,7 @@ export function useRawDashboardData(
   const [uploadedEvents, setUploadedEvents] = useState<RiskItem[]>([]);
   const [backendRoutes, setBackendRoutes] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     factoryLocationTypes: [],
     logisticCenterLocationTypes: [],
@@ -35,6 +36,7 @@ export function useRawDashboardData(
   const [locationList, setLocationList] = useState<LocationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitLoading, setIsInitLoading] = useState(true);
+  const lastDeniedListRequestRef = useRef<string>('');
 
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
 
@@ -134,6 +136,7 @@ export function useRawDashboardData(
         // Clear stale list immediately when query conditions (status/page/filter) change.
         setBackendEvents([]);
         setTotalPages(1);
+        setTotalElements(0);
         const safeJson = async (res: Response, requestUrl: string) => {
           const text = await res.text();
           if (!res.ok) {
@@ -147,11 +150,11 @@ export function useRawDashboardData(
             return null;
           }
         };
-        const authHeaders = { Authorization: `Bearer ${getToken()}` };
+        const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
         const toQueryList = (list: string[] | undefined) => {
           const values = (list || [])
-            .map((value) => Number(value))
-            .filter((value) => Number.isFinite(value));
+            .map((value) => String(value).trim())
+            .filter((value) => value.length > 0 && value !== '0');
           return values.length ? values.join(',') : '';
         };
         const setIfPresent = (params: URLSearchParams, key: string, value: string) => {
@@ -191,10 +194,42 @@ export function useRawDashboardData(
           ? `${backendBaseUrl}/api/v1/logis-move/totallist?${queryString}`
           : `${backendBaseUrl}/api/v1/logis-move/totallist`;
 
-        const evtRes = await fetch(
-          listUrl,
-          { headers: authHeaders, signal: controller.signal }
-        ).then((res) => safeJson(res, listUrl));
+        const maxAttempts = 40;
+        let evtRes: any = null;
+        let deniedToken: string | null = null;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+          if (controller.signal.aborted) return;
+          const token = getToken();
+          if (!token) {
+            await wait(250);
+            continue;
+          }
+          const deniedKey = `${listUrl}|${token}`;
+          if (lastDeniedListRequestRef.current === deniedKey) {
+            break;
+          }
+
+          const res = await fetch(listUrl, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            await res.text();
+            lastDeniedListRequestRef.current = deniedKey;
+            if (deniedToken && deniedToken === token) {
+              break;
+            }
+            deniedToken = token;
+            await wait(300);
+            continue;
+          }
+
+          lastDeniedListRequestRef.current = '';
+          evtRes = await safeJson(res, listUrl);
+          break;
+        }
 
         const extractList = (payload: any): any[] => {
           if (Array.isArray(payload)) return payload;
@@ -218,6 +253,10 @@ export function useRawDashboardData(
           (evtRes as any)?.data?.totalPages ||
           (evtRes as any)?.result?.totalPages ||
           1;
+        const totalElementsFromPayload =
+          (evtRes as any)?.totalElements ??
+          (evtRes as any)?.data?.totalElements ??
+          (evtRes as any)?.result?.totalElements;
 
         if (Array.isArray(evtRes)) {
           const safePage = typeof page === 'number' && Number.isFinite(page) && page >= 0 ? Math.floor(page) : 0;
@@ -228,9 +267,11 @@ export function useRawDashboardData(
           const end = start + safeSize;
           const paged = list.slice(start, end);
           setTotalPages(totalPages);
+          setTotalElements(total);
           setBackendEvents(paged.flatMap(normalizeBackendEvent));
         } else {
           setTotalPages(totalPagesFromPayload || 1);
+          setTotalElements(Number.isFinite(Number(totalElementsFromPayload)) ? Number(totalElementsFromPayload) : list.length);
           setBackendEvents(list.flatMap(normalizeBackendEvent));
         }
       } catch (err) {
@@ -343,5 +384,5 @@ export function useRawDashboardData(
     };
   }, [backendBaseUrl]);
 
-  return { backendEvents, uploadedEvents, backendRoutes, filterOptions, locationList, totalPages, isLoading, isInitLoading };
+  return { backendEvents, uploadedEvents, backendRoutes, filterOptions, locationList, totalPages, totalElements, isLoading, isInitLoading };
 }

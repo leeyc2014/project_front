@@ -7,6 +7,7 @@ type SerialListProps = {
   page: number;
   size: number;
   totalPages: number;
+  totalElements?: number;
   onPageChange: (page: number) => void;
   statusFilter: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER';
   onStatusChange: (status: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER') => void;
@@ -170,8 +171,8 @@ const SerialList: React.FC<SerialListProps> = ({
   statusFilter,
   onStatusChange,
   page,
-  size,
   totalPages,
+  totalElements = 0,
   onPageChange,
 }) => {
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -209,8 +210,8 @@ const SerialList: React.FC<SerialListProps> = ({
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-3 gap-2">
-        <h2 className="text-xs font-black text-white uppercase tracking-widest">
-          Serial List
+        <h2 className="text-sm font-black text-white uppercase tracking-widest">
+          Total: {totalElements}
         </h2>
         <div className="flex items-center gap-1 bg-gray-800 rounded-full p-0.5">
           {(['ALL', 'SAFE', 'CAUTION', 'DANGER'] as const).map((key) => (

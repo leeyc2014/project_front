@@ -65,14 +65,39 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(num) ? num : 0;
 };
 
-const normalizeKpi = (kpi: any) => ({
-  unregisteredEpc: toNumber(kpi?.unregisteredEpc ?? kpi?.unregistered_epc ?? kpi?.missingEpc ?? kpi?.missing_epc),
-  integrityErrorEpc: toNumber(kpi?.integrityErrorEpc ?? kpi?.integrity_error_epc ?? kpi?.integrityEpc),
-  clonedEpc: toNumber(kpi?.clonedEpc ?? kpi?.cloned_epc ?? kpi?.replicaEpc ?? kpi?.replica_epc),
-  duplicateEpc: toNumber(kpi?.duplicateEpc ?? kpi?.duplicate_epc ?? kpi?.duplicatedEpc ?? kpi?.duplicated_epc ?? kpi?.redundantEpc ?? kpi?.redundant_epc),
-  invalidHubMove: toNumber(kpi?.invalidHubMove ?? kpi?.invalid_hub_move ?? kpi?.invalidHubMovement ?? kpi?.invalidLocationMove ?? kpi?.invalid_location_move),
-  impossibleSpeed: toNumber(kpi?.impossibleSpewed ?? kpi?.impossible_speed ?? kpi?.speedImpossible),
-});
+const normalizeKpi = (kpi: any) => {
+  if (Array.isArray(kpi)) {
+    const byStatus = new Map<string, number>();
+    kpi.forEach((item: any) => {
+      const status = String(item?.status ?? '').trim();
+      if (!status) return;
+      byStatus.set(status, toNumber(item?.ratio));
+    });
+    const pick = (...aliases: string[]) => {
+      for (const alias of aliases) {
+        if (byStatus.has(alias)) return toNumber(byStatus.get(alias));
+      }
+      return 0;
+    };
+    return {
+      unregisteredEpc: pick('unregisteredEpc', 'unregistered_epc', 'missingEpc', 'missing_epc'),
+      integrityErrorEpc: pick('integrityErrorEpc', 'integrity_error_epc', 'integrityEpc'),
+      clonedEpc: pick('clonedEpc', 'cloned_epc', 'replicaEpc', 'replica_epc'),
+      duplicateEpc: pick('duplicateEpc', 'duplicate_epc', 'duplicatedEpc', 'duplicated_epc', 'redundantEpc', 'redundant_epc'),
+      invalidHubMove: pick('invalidHubMove', 'invalid_hub_move', 'invalidHubMovement', 'invalidLocationMove', 'invalid_location_move'),
+      impossibleSpeed: pick('impossibleSpeed', 'impossible_speed', 'impossibleSpewed', 'speedImpossible'),
+    };
+  }
+
+  return {
+    unregisteredEpc: toNumber(kpi?.unregisteredEpc ?? kpi?.unregistered_epc ?? kpi?.missingEpc ?? kpi?.missing_epc),
+    integrityErrorEpc: toNumber(kpi?.integrityErrorEpc ?? kpi?.integrity_error_epc ?? kpi?.integrityEpc),
+    clonedEpc: toNumber(kpi?.clonedEpc ?? kpi?.cloned_epc ?? kpi?.replicaEpc ?? kpi?.replica_epc),
+    duplicateEpc: toNumber(kpi?.duplicateEpc ?? kpi?.duplicate_epc ?? kpi?.duplicatedEpc ?? kpi?.duplicated_epc ?? kpi?.redundantEpc ?? kpi?.redundant_epc),
+    invalidHubMove: toNumber(kpi?.invalidHubMove ?? kpi?.invalid_hub_move ?? kpi?.invalidHubMovement ?? kpi?.invalidLocationMove ?? kpi?.invalid_location_move),
+    impossibleSpeed: toNumber(kpi?.impossibleSpeed ?? kpi?.impossibleSpewed ?? kpi?.impossible_speed ?? kpi?.speedImpossible),
+  };
+};
 
 const normalizeLocationId = (value: unknown) => {
   const raw = String(value ?? '').trim();

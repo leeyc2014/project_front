@@ -389,6 +389,7 @@ export default function LogisticsMap({
       (d) => isValidCoords(d?.source_info?.coords) && isValidCoords(d?.target_info?.coords)
     );
     if (cleanedRoutes.length === 0) return [];
+    const FALLBACK_ARC_HEIGHT = 0.72;
     const toRatio = (count: number) => {
       const value = Number.isFinite(count) ? Math.max(0, count) : 0;
       if (routeCountScale.max <= routeCountScale.min) return 1;
@@ -402,12 +403,40 @@ export default function LogisticsMap({
       const ratio = toRatio(count);
       return minWidth + (maxWidth - minWidth) * ratio;
     };
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const getDistanceKm = (from: [number, number], to: [number, number]) => {
+      // Coordinates are [lng, lat]
+      const [lng1, lat1] = from;
+      const [lng2, lat2] = to;
+      if (![lng1, lat1, lng2, lat2].every(Number.isFinite)) return NaN;
+      if (lat1 < -90 || lat1 > 90 || lat2 < -90 || lat2 > 90) return NaN;
+      if (lng1 < -180 || lng1 > 180 || lng2 < -180 || lng2 > 180) return NaN;
 
-    const getScaledHeight = (count: number) => {
-      const minHeight = 0.5;
-      const maxHeight = 1.35;
-      const ratio = toRatio(count);
-      return minHeight + (maxHeight - minHeight) * ratio;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return 6371 * c;
+    };
+
+    const routeDistances = cleanedRoutes
+      .map((route) => getDistanceKm(route.source_info.coords, route.target_info.coords))
+      .filter((distance) => Number.isFinite(distance) && distance > 0);
+    const distanceScale = routeDistances.length > 0
+      ? { min: Math.min(...routeDistances), max: Math.max(...routeDistances) }
+      : { min: 0, max: 0 };
+    const getScaledHeightByDistance = (source: [number, number], target: [number, number]) => {
+      const minHeight = 0.3;
+      const maxHeight = 0.60;
+      const distance = getDistanceKm(source, target);
+      if (!Number.isFinite(distance) || distance <= 0) return FALLBACK_ARC_HEIGHT;
+      if (distanceScale.max <= distanceScale.min) return FALLBACK_ARC_HEIGHT;
+      const ratio = (distance - distanceScale.min) / (distanceScale.max - distanceScale.min);
+      const safeRatio = Math.min(1, Math.max(0, ratio));
+      return minHeight + (maxHeight - minHeight) * safeRatio;
     };
 
     const nodeMap = new globalThis.Map<string, { position: [number, number]; label: string }>();
@@ -433,7 +462,7 @@ export default function LogisticsMap({
         getWidth: (d) => getScaledWidth(d.count || 0),
         getHeight: (d) => {
           if (d.source_info.id === d.target_info.id) return 0;
-          return getScaledHeight(d.count || 0);
+          return getScaledHeightByDistance(d.source_info.coords, d.target_info.coords);
         },
         widthUnits: 'pixels',
         opacity: 1,

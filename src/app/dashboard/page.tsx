@@ -15,7 +15,6 @@ const LogisticsMap = dynamic(() => import('@/components/dashboard/LogisticsMap')
   ssr: false,
   loading: () => <div style={{ background: '#000', height: '100vh' }}>Loading map...</div>
 });
-
 const Section = ({ title, children, headerRight }: any) => (
   <div className="flex flex-col h-full bg-gray-900/90 border border-gray-800 shadow-lg overflow-hidden backdrop-blur-sm text-gray-100">
     <div className="h-12 px-4 bg-gray-900/95 border-b border-gray-800 flex items-center justify-between flex-none">
@@ -45,7 +44,7 @@ export default function DashboardPage() {
   const epcCodeQuery = (searchParams.get('epcCode') || '').trim();
   const isSingleEpcCodeMode = useMemo(() => {
     if (!epcCodeQuery) return false;
-    const allowedKeys = new Set(['epcCode', 'page', 'size']);
+    const allowedKeys = new Set(['epcCode', 'page', 'size', 'eventTimeStart', 'eventTimeEnd']);
     const keys = Array.from(searchParams.keys());
     return keys.every((key) => allowedKeys.has(key));
   }, [epcCodeQuery, searchParams]);
@@ -55,7 +54,7 @@ export default function DashboardPage() {
     return value
       .split(',')
       .map((v) => v.trim())
-      .filter((v) => v !== '0' && v.length > 0 && Number.isFinite(Number(v)));
+      .filter((v) => v !== '0' && v.length > 0);
   };
 
   const parseNullableNumber = (value: string | null): number | null => {
@@ -66,7 +65,7 @@ export default function DashboardPage() {
   };
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const { backendEvents, uploadedEvents, backendRoutes, filterOptions, locationList, totalPages, isLoading } = useRawDashboardData(pageParam, size, status, filters);
+  const { backendEvents, uploadedEvents, backendRoutes, filterOptions, locationList, totalPages, totalElements, isLoading } = useRawDashboardData(pageParam, size, status, filters);
   const [chartData, setChartData] = useState<any>(null);
   const [isChartLoading, setIsChartLoading] = useState(true);
   const hubLocationMap = useMemo(() => {
@@ -202,7 +201,6 @@ export default function DashboardPage() {
     return sessionStorage.getItem('token') || '';
   };
 
-
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     setFilters({
@@ -238,8 +236,8 @@ export default function DashboardPage() {
         const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
         const toCsv = (list: string[] | undefined) => {
           const values = (list || [])
-            .map((value) => Number(value))
-            .filter((value) => Number.isFinite(value));
+            .map((value) => String(value).trim())
+            .filter((value) => value.length > 0 && value !== '0');
           return values.length ? values.join(',') : '';
         };
         const setIfPresent = (params: URLSearchParams, key: string, value: string) => {
@@ -440,17 +438,17 @@ export default function DashboardPage() {
   }, [router, searchParams]);
 
   const handleStatusChange = useCallback((nextStatus: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER') => {
-    const params = new URLSearchParams(searchParams.toString());
+    const current = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams();
 
-    if (nextStatus !== 'ALL') {
-      params.set('status', nextStatus);
-    } else {
-      params.delete('status');
+    if (nextStatus !== 'ALL') params.set('status', nextStatus);
+    params.set('page', '0');
+
+    for (const [key, value] of current.entries()) {
+      if (key === 'status' || key === 'st' || key === 'page' || key === 'size') continue;
+      params.set(key, value);
     }
 
-    params.set('page', '0');
-    params.delete('size');
-    params.delete('st');
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
 
@@ -459,8 +457,8 @@ export default function DashboardPage() {
 
     const toCsv = (list: string[] | undefined) => {
       const values = (list || [])
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value));
+        .map((value) => String(value).trim())
+        .filter((value) => value.length > 0 && value !== '0');
       return values.length ? values.join(',') : '';
     };
 
@@ -476,8 +474,12 @@ export default function DashboardPage() {
 
     params.set('page', '0');
     params.delete('size');
-    params.delete('status');
     params.delete('st');
+    if (status !== 'ALL') {
+      params.set('status', status);
+    } else {
+      params.delete('status');
+    }
 
     setOrDelete(params, 'factoryLocations', toCsv(nextFilters.factoryLocationTypes));
     setOrDelete(params, 'logisticCenterLocations', toCsv(nextFilters.logisticCenterLocationTypes));
@@ -498,7 +500,7 @@ export default function DashboardPage() {
 
     setResetToken((prev) => prev + 1);
     router.push(`/dashboard?${params.toString()}`);
-  }, [router]);
+  }, [router, status]);
 
   const handleApplySerialEpcFilter = useCallback((epcCode: string) => {
     const value = (epcCode || '').trim();
@@ -659,7 +661,7 @@ export default function DashboardPage() {
             }`}
             ref={rightPanelRef}
           >
-              <Section title="Serial Item List">
+              <Section title="Logistics Tracking List">
                 <SerialList
                   serials={serials}
                   eventsBySerial={eventsBySerial}
@@ -676,6 +678,7 @@ export default function DashboardPage() {
                   page={page}
                   size={size ?? 15}
                   totalPages={totalPages}
+                  totalElements={totalElements}
                   onPageChange={handlePageChange}
                 />
               </Section>

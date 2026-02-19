@@ -33,6 +33,7 @@ export default function Page() {
     const [loginState, setLoginState] = useState<boolean | null>(null);
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+    const defaultDashboardQuery = 'eventTimeStart=2024-07-25&eventTimeEnd=2024-07-31';
     const setTokenCookie = (token: string) => {
         const secure = typeof window !== 'undefined' && window.location.protocol == 'https:' ? '; Secure' : '';
         document.cookie = `token=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
@@ -82,7 +83,7 @@ export default function Page() {
                 }
 
                 // 대시보드로 이동
-                router.push('/dashboard');
+                router.push(`/dashboard?${defaultDashboardQuery}`);
             } else {
                 // 백엔드에서 보낸 실패 메시지 출력 (비번 틀림 등)
                 alert(result.message || "로그인에 실패했습니다. 정보를 확인하세요.");
