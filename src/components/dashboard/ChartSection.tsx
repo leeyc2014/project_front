@@ -44,7 +44,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   W_STOCK_OUTBOUND: '도매(Out)',
   R_STOCK_INBOUND: '소매(In)',
   R_STOCK_OUTBOUND: '소매(Out)',
-  POSSELL: '판매완료',
   POS_SELL: '판매완료',
 };
 
@@ -72,7 +71,7 @@ const normalizeKpi = (kpi: any) => ({
   clonedEpc: toNumber(kpi?.clonedEpc ?? kpi?.cloned_epc ?? kpi?.replicaEpc ?? kpi?.replica_epc),
   duplicateEpc: toNumber(kpi?.duplicateEpc ?? kpi?.duplicate_epc ?? kpi?.duplicatedEpc ?? kpi?.duplicated_epc ?? kpi?.redundantEpc ?? kpi?.redundant_epc),
   invalidHubMove: toNumber(kpi?.invalidHubMove ?? kpi?.invalid_hub_move ?? kpi?.invalidHubMovement ?? kpi?.invalidLocationMove ?? kpi?.invalid_location_move),
-  impossibleSpeed: toNumber(kpi?.impossibleSpeed ?? kpi?.impossible_speed ?? kpi?.speedImpossible),
+  impossibleSpeed: toNumber(kpi?.impossibleSpewed ?? kpi?.impossible_speed ?? kpi?.speedImpossible),
 });
 
 const normalizeLocationId = (value: unknown) => {
@@ -92,9 +91,13 @@ const toTwoLineLabel = (value: string): XAxisCategory => {
 };
 
 const resolveEventTypeLabel = (raw: string) => {
-  if (!raw) return 'Other';
-  const normalized = raw.toUpperCase().replace(/[\s-]+/g, '_');
-  return EVENT_TYPE_LABELS[normalized] || raw;
+  const source = String(raw ?? '').trim();
+  if (!source) return 'Other';
+  const normalized = source
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return EVENT_TYPE_LABELS[normalized] || EVENT_TYPE_LABELS[normalized.replace(/_/g, '')] || source;
 };
 
 type BarOptionsConfig = {
@@ -346,10 +349,26 @@ export function EpcTimelineModal({
       const tb = Date.parse(b.eventTime || '');
       return ta - tb;
     });
-    const eventTypes = Array.from(new Set(sorted.map((event) => event.eventType || 'Unknown')));
+    const getEventType = (event: RiskItem) => {
+      const value = String(event?.eventType ?? '').trim();
+      return value || 'Unknown';
+    };
+    const eventTypes = Array.from(new Set(sorted.map((event) => getEventType(event))));
+    const getTimelineLabel = (axisValue: number) => {
+      if (eventTypes.length === 0) return '';
+      const index = Math.max(0, Math.min(eventTypes.length - 1, Math.round(axisValue)));
+      return resolveEventTypeLabel(eventTypes[index] || '');
+    };
+    const firstTime = sorted.length > 0 ? Date.parse(sorted[0].eventTime || '') : NaN;
+    const lastTime = sorted.length > 0 ? Date.parse(sorted[sorted.length - 1].eventTime || '') : NaN;
+    const hasValidTimeRange = Number.isFinite(firstTime) && Number.isFinite(lastTime);
+    const range = hasValidTimeRange ? Math.max(0, lastTime - firstTime) : 0;
+    const timePadding = range > 0 ? Math.max(60 * 60 * 1000, Math.floor(range * 0.08)) : 24 * 60 * 60 * 1000;
+    const xAxisMin = hasValidTimeRange ? firstTime - timePadding : undefined;
+    const xAxisMax = hasValidTimeRange ? lastTime + timePadding : undefined;
     const seriesData = sorted.map((event) => ({
       x: new Date(event.eventTime).getTime(),
-      y: eventTypes.indexOf(event.eventType || 'Unknown'),
+      y: eventTypes.indexOf(getEventType(event)),
       meta: event,
     }));
 
@@ -362,10 +381,15 @@ export function EpcTimelineModal({
       ],
       options: {
         chart: { type: 'line', toolbar: { show: false }, zoom: { enabled: false }, foreColor: '#e5e7eb' },
-        xaxis: { type: 'datetime', labels: { style: { fontSize: '10px', fontWeight: 600 } } },
+        xaxis: {
+          type: 'datetime',
+          min: xAxisMin,
+          max: xAxisMax,
+          labels: { style: { fontSize: '10px', fontWeight: 600 } },
+        },
         yaxis: {
           labels: {
-            formatter: (value: number) => eventTypes[Math.round(value)] ?? '',
+            formatter: (value: number) => getTimelineLabel(value),
             style: { fontSize: '10px', fontWeight: 600 },
           },
           tickAmount: Math.max(1, eventTypes.length - 1),
@@ -449,4 +473,3 @@ export function EpcTimelineModal({
     </div>
   );
 }
-

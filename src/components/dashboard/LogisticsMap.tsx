@@ -41,7 +41,6 @@ export default function LogisticsMap({
   trackingPath,
   resetToken,
   viewportPadding,
-  isEpcFocused = false,
 }: LogisticsMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapContainerIdRef = useRef(`logistics-map-${Math.random().toString(36).slice(2, 11)}`);
@@ -138,6 +137,19 @@ export default function LogisticsMap({
       })
       .filter((route): route is RouteData => Boolean(route));
   }, [routeData, epcFilter]);
+
+  const routeCountScale = useMemo(() => {
+    const counts = routeData
+      .map((route) => Number(route?.count ?? 0))
+      .filter((count) => Number.isFinite(count) && count >= 0);
+    if (counts.length === 0) {
+      return { min: 0, max: 0 };
+    }
+    return {
+      min: Math.min(...counts),
+      max: Math.max(...counts),
+    };
+  }, [routeData]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || overlayRef.current) return;
@@ -377,6 +389,27 @@ export default function LogisticsMap({
       (d) => isValidCoords(d?.source_info?.coords) && isValidCoords(d?.target_info?.coords)
     );
     if (cleanedRoutes.length === 0) return [];
+    const toRatio = (count: number) => {
+      const value = Number.isFinite(count) ? Math.max(0, count) : 0;
+      if (routeCountScale.max <= routeCountScale.min) return 1;
+      const ratio = (value - routeCountScale.min) / (routeCountScale.max - routeCountScale.min);
+      return Math.min(1, Math.max(0, ratio));
+    };
+
+    const getScaledWidth = (count: number) => {
+      const minWidth = 3.7;
+      const maxWidth = 8.2;
+      const ratio = toRatio(count);
+      return minWidth + (maxWidth - minWidth) * ratio;
+    };
+
+    const getScaledHeight = (count: number) => {
+      const minHeight = 0.5;
+      const maxHeight = 1.35;
+      const ratio = toRatio(count);
+      return minHeight + (maxHeight - minHeight) * ratio;
+    };
+
     const nodeMap = new globalThis.Map<string, { position: [number, number]; label: string }>();
     cleanedRoutes.forEach((route) => {
       const sourceKey = `${route.source_info.id}:${route.source_info.coords[0]}:${route.source_info.coords[1]}`;
@@ -397,22 +430,10 @@ export default function LogisticsMap({
         getTargetPosition: (d) => d.target_info.coords,
         getSourceColor: (d) => getRouteColor(d),
         getTargetColor: (d) => getRouteColor(d),
-        getWidth: (d) => {
-          const count = d.count || 0;
-          const weight = Math.sqrt(Math.max(count, 1));
-          if (isEpcFocused) {
-            return Math.min(7.8, 2.6 + weight * 1.8);
-          }
-          return Math.min(5.8, 1.3 + weight * 0.3);
-        },
+        getWidth: (d) => getScaledWidth(d.count || 0),
         getHeight: (d) => {
           if (d.source_info.id === d.target_info.id) return 0;
-          const count = d.count || 0;
-          const weight = Math.sqrt(Math.max(count, 1));
-          if (isEpcFocused) {
-            return Math.min(1.35, 0.24 + weight * 0.32);
-          }
-          return Math.min(0.6, 0.1 + weight * 0.022);
+          return getScaledHeight(d.count || 0);
         },
         widthUnits: 'pixels',
         opacity: 1,
@@ -432,7 +453,7 @@ export default function LogisticsMap({
         pickable: true,
       }),
     ];
-  }, [mapReady, filteredRoutes, trackingPath, trackingTime, isEpcFocused]);
+  }, [mapReady, filteredRoutes, trackingPath, trackingTime, routeCountScale]);
 
   useEffect(() => {
     if (overlayRef.current) overlayRef.current.setProps({ layers });

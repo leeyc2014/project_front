@@ -1,119 +1,174 @@
-"use client";
-import React, { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+﻿"use client";
 
-export default function LogUploadPage() {
-    const router = useRouter();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [uploadStatus, setUploadStatus] = useState<'IDLE' | 'UPLOADING' | 'COMPLETED'>('IDLE');
-    const [progress, setProgress] = useState(0);
-    const [isDragging, setIsDragging] = useState(false);
+import React, { useState, useRef, useEffect } from 'react';
 
-    const processFile = async (file: File) => {
-        if (!file) return;
+// 서버에서 내려오는 데이터 구조 정의
+interface LogisticsData {
+  message?: string;
+  percent?: number;
+}
 
-        setUploadStatus('UPLOADING');
-        setProgress(10); // 시작 표시
+interface LogEntry {
+  time: string;
+  message: string;
+}
 
-        const formData = new FormData();
-        formData.append('file', file);
+export default function LogisticsProcessor() {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [percent, setPercent] = useState<number>(0);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
-        try {
-            // 파일을 스트림으로 직접 전송 (JSON 파싱 X)
-            const response = await fetch('/api/epcis/events', {
-                method: 'POST',
-                body: formData,
-                // 주의: FormData를 보낼 때는 Content-Type 헤더를 수동으로 설정하지 마세요.
-            });
+  const getToken = () => {
+    if (typeof window === 'undefined') return '';
+    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
+    if (match) return decodeURIComponent(match[1]);
+    return sessionStorage.getItem('token') || '';
+  };
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || '서버 저장 실패');
-            }
+  // 로그 추가 시 자동 스크롤
+  useEffect(() => {
+    if (logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
 
-            setProgress(100);
-            setTimeout(() => setUploadStatus('COMPLETED'), 800);
-        } catch (error: any) {
-            console.error("Upload Error:", error);
-            alert(error.message || "데이터 업로드 중 오류가 발생했습니다.");
-            setUploadStatus('IDLE');
-            setProgress(0);
+  const addLog = (msg: string) => {
+    const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+    setLogs((prev) => [...prev, { time, message: msg }]);
+  };
+
+  const processLine = (jsonString: string) => {
+    const trimmed = jsonString.trim();
+    if (!trimmed) return;
+
+    try {
+      const data: LogisticsData = JSON.parse(trimmed);
+      if (data.message) addLog(data.message);
+      if (typeof data.percent === 'number') setPercent(data.percent);
+    } catch (e) {
+      console.warn("JSON 파싱 실패:", trimmed);
+      addLog(trimmed);
+    }
+  };
+
+  const handleUpload = async () => {
+    const files = fileInputRef.current?.files;
+    if (!files || files.length === 0) {
+      alert("파일을 선택해주세요.");
+      return;
+    }
+
+    // 초기화
+    setLogs([]);
+    setPercent(0);
+    setIsProcessing(true);
+
+    const formData = new FormData();
+    formData.append('file', files[0]);
+
+    const token = getToken();
+    if (!token) {
+      alert('로그인 토큰이 없습니다. 다시 로그인 해주세요.');
+      setIsProcessing(false);
+      return;
+    }
+
+    const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+    if (!backendBaseUrl) {
+      alert('백엔드 URL이 설정되지 않았습니다.');
+      setIsProcessing(false);
+      return;
+    }
+    const url = `${backendBaseUrl}/api/v1/logistics/upload`;
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+      if (!res.body) throw new Error("ReadableStream을 지원하지 않는 응답입니다.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          if (buffer.trim()) processLine(buffer);
+          break;
         }
-    };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) processFile(file);
-    };
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
-    };
+        for (const line of lines) {
+          processLine(line);
+        }
+      }
 
-    const handleDragLeave = () => setIsDragging(false);
+      addLog("✅ 모든 작업이 완료되었습니다.");
+    } catch (error: any) {
+      console.error(error);
+      addLog(`❌ 에러 발생: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) processFile(file);
-    };
+  return (
+    <div className="max-w-3xl mx-auto p-5 font-sans">
+      <h2 className="text-2xl font-bold mb-5">물류 데이터 처리 현황</h2>
 
-    return (
-        <div className="h-full max-w-4xl mx-auto flex flex-col justify-center p-6 space-y-8">
-            <div className="text-center">
-                <h2 className="text-4xl font-black text-gray-900 italic uppercase tracking-tighter">Log Data Import</h2>
-                <p className="text-gray-500 mt-3 font-medium">대용량 로그도 안정적으로 처리합니다.</p>
-            </div>
+      <div className="flex gap-2 mb-5">
+        <input 
+          type="file" 
+          ref={fileInputRef}
+          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        />
+        <button 
+          onClick={handleUpload}
+          disabled={isProcessing}
+          className={`px-4 py-2 rounded-md text-white font-medium ${isProcessing ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+        >
+          {isProcessing ? '처리 중...' : '업로드 및 분석 시작'}
+        </button>
+      </div>
 
-            {uploadStatus === 'IDLE' && (
-                <div
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={`group h-96 border-4 border-dashed rounded-[50px] flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${
-                        isDragging ? 'border-blue-600 bg-blue-100/50 scale-[1.02]' : 'border-gray-200 bg-transparent hover:border-blue-500 hover:bg-blue-50/50'
-                    }`}
-                >
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv, .txt" className="hidden" />
-                    <div className="w-24 h-24 bg-gray-100 group-hover:bg-blue-500 rounded-3xl flex items-center justify-center mb-6 transition-all">
-                        <svg className="w-12 h-12 text-gray-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                    </div>
-                    <p className="text-xl font-black text-gray-800">CSV/TSV 파일을 드래그하거나 클릭하세요</p>
-                </div>
-            )}
-
-            {uploadStatus === 'UPLOADING' && (
-                <div className="bg-white p-20 rounded-[50px] shadow-2xl border border-gray-100 text-center space-y-8">
-                    <div className="relative w-40 h-40 mx-auto">
-                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                            <circle className="text-gray-100 stroke-current" strokeWidth="10" fill="transparent" r="40" cx="50" cy="50" />
-                            <circle className="text-blue-600 stroke-current transition-all duration-500" strokeWidth="10" strokeDasharray={251.2} strokeDashoffset={251.2 - (251.2 * progress) / 100} strokeLinecap="round" fill="transparent" r="40" cx="50" cy="50" />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center font-black text-2xl text-blue-600">{progress}%</div>
-                    </div>
-                    <p className="text-2xl font-black italic uppercase">Server Processing Large File...</p>
-                </div>
-            )}
-
-            {uploadStatus === 'COMPLETED' && (
-                <div className="bg-gray-900 p-16 rounded-[50px] text-white shadow-2xl">
-                    <div className="flex items-center space-x-8 mb-10">
-                        <div className="w-20 h-20 bg-green-500 rounded-[24px] flex items-center justify-center shadow-green-500/40 animate-bounce">
-                            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
-                        </div>
-                        <div>
-                            <h3 className="text-4xl font-black italic">SUCCESS</h3>
-                            <p className="text-gray-400">데이터 매핑 완료</p>
-                        </div>
-                    </div>
-                    <button onClick={() => router.push('/dashboard')} className="w-full py-6 bg-blue-600 hover:bg-blue-500 rounded-[24px] font-black text-2xl transition-all">GO DASHBOARD</button>
-                </div>
-            )}
+      {/* 프로그레스 바 영역 */}
+      <div className="bg-gray-100 p-4 rounded-lg border border-gray-300 mb-5">
+        <div className="flex justify-between mb-2">
+          <span className="text-sm font-bold text-gray-700">진행률</span>
+          <span className="text-sm font-bold text-blue-600">{percent}%</span>
         </div>
-    );
+        <div className="w-full bg-gray-300 rounded-full h-6 overflow-hidden">
+          <div 
+            className="bg-blue-500 h-full transition-all duration-300" 
+            style={{ width: `${percent}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* 로그 출력 영역 (터미널 스타일) */}
+      <div className="w-full h-[400px] bg-[#1e1e1e] text-[#00ff00] overflow-y-auto p-4 rounded-md font-mono text-sm leading-relaxed border border-gray-800">
+        {logs.map((log, index) => (
+          <div key={index} className="border-b border-gray-800 py-1 break-all">
+            <span className="text-gray-500 mr-2">[{log.time}]</span>
+            {log.message}
+          </div>
+        ))}
+        <div ref={logEndRef} />
+      </div>
+    </div>
+  );
 }
