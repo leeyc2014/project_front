@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Map, LngLatBounds } from 'maplibre-gl';
+import { Map as MapLibreMap, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { ArcLayer, ScatterplotLayer } from '@deck.gl/layers';
@@ -9,6 +9,8 @@ import { ArcLayer, ScatterplotLayer } from '@deck.gl/layers';
 // --- Types ---
 export interface RouteData {
   count: number;
+  cautionCount?: number;
+  errorCount?: number;
   source_info: { id: string; name: string; coords: [number, number] };
   target_info: { id: string; name: string; coords: [number, number] };
   epc_list: string[];
@@ -26,11 +28,24 @@ type LogisticsMapProps = {
   trackingPath?: TrackingPoint[] | null;
   resetToken?: number;
   viewportPadding?: { top: number; bottom: number; left: number; right: number };
+  isEpcFocused?: boolean;
 };
 
-export default function LogisticsMap({ epcFilter, routes, trackingPath, resetToken, viewportPadding }: LogisticsMapProps) {
+const INITIAL_CENTER: [number, number] = [128.1, 35.3];
+const INITIAL_ZOOM = 7.8;
+const INITIAL_PITCH = 60;
+
+export default function LogisticsMap({
+  epcFilter,
+  routes,
+  trackingPath,
+  resetToken,
+  viewportPadding,
+  isEpcFocused = false,
+}: LogisticsMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<Map | null>(null);
+  const mapContainerIdRef = useRef(`logistics-map-${Math.random().toString(36).slice(2, 11)}`);
+  const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
   const trackingFrameRef = useRef<number | null>(null);
   
@@ -41,20 +56,64 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
   const isValidCoords = (coords: [number, number] | undefined) =>
     Array.isArray(coords) && coords.length === 2 && coords.every((v) => Number.isFinite(v));
   const KOREA_BOUNDS: [[number, number], [number, number]] = [[124.6, 33.1], [131.9, 38.7]];
+  const getRouteColor = (route: RouteData): [number, number, number, number] => {
+    const totalCount = Math.max(0, Number(route.count ?? 0) || 0);
+    const cautionCount = Math.max(0, Number(route.cautionCount ?? 0) || 0);
+    const errorCount = Math.max(0, Number(route.errorCount ?? 0) || 0);
+    if (totalCount <= 0) return [120, 120, 120, 255];
+
+    // "정상" 비율은 혼합에서 제외하고, caution/error 비율로만 노랑~빨강을 결정
+    const cautionRatio = cautionCount / totalCount;
+    const errorRatio = errorCount / totalCount;
+    const riskRatio = cautionRatio + errorRatio;
+    if (riskRatio <= 0) return [34, 197, 94, 255];
+
+    const yellow = { r: 255, g: 220, b: 0 };
+    const red = { r: 255, g: 0, b: 0 };
+
+    const redWeight = Math.min(1, Math.max(0, errorRatio / riskRatio));
+    const r = Math.round(yellow.r * (1 - redWeight) + red.r * redWeight);
+    const g = Math.round(yellow.g * (1 - redWeight) + red.g * redWeight);
+    const b = Math.round(yellow.b * (1 - redWeight) + red.b * redWeight);
+    return [r, g, b, 255];
+  };
 
   useEffect(() => {
-    if (!mapContainerRef.current) return;
-    const map = new Map({
-      container: mapContainerRef.current,
-      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-      center: [127.6, 36.4],
-      zoom: 7,
-      pitch: 40,
-      bearing: 0,
-    });
-    mapRef.current = map;
-    map.on('load', () => setMapReady(true));
-    return () => map.remove();
+    let rafId: number | null = null;
+
+    const initMap = () => {
+      const container = mapContainerRef.current;
+      if (mapRef.current) return;
+      if (!container || container.nodeType !== 1) return;
+      if (!container.id) {
+        container.id = mapContainerIdRef.current;
+      }
+
+      const map = new MapLibreMap({
+        container: container.id,
+        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        center: INITIAL_CENTER,
+        zoom: INITIAL_ZOOM,
+        pitch: INITIAL_PITCH,
+        bearing: 0,
+      });
+      mapRef.current = map;
+      map.on('load', () => setMapReady(true));
+    };
+
+    initMap();
+    if (!mapRef.current) {
+      rafId = requestAnimationFrame(initMap);
+    }
+
+    return () => {
+      if (rafId != null) cancelAnimationFrame(rafId);
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      setMapReady(false);
+    };
   }, []);
 
   useEffect(() => {
@@ -66,6 +125,9 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
     const set = new Set(epcFilter);
     return routeData
       .map((route) => {
+        if (!Array.isArray(route.epc_list) || route.epc_list.length === 0) {
+          return route;
+        }
         const matched = route.epc_list.filter((epc) => set.has(epc));
         if (matched.length === 0) return null;
         return {
@@ -84,7 +146,23 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
       layers: [],
       getTooltip: () => null,
       getCursor: ({ isHovering }: { isHovering: boolean }) => (isHovering ? 'pointer' : ''),
-      onHover: ({ x, y, object }: { x: number; y: number; object?: { label?: string; count?: number; epc_list?: string[] } }) => {
+      onHover: ({
+        x,
+        y,
+        object,
+      }: {
+        x: number;
+        y: number;
+        object?: {
+          label?: string;
+          count?: number;
+          cautionCount?: number;
+          errorCount?: number;
+          epc_list?: string[];
+          source_info?: { name?: string };
+          target_info?: { name?: string };
+        };
+      }) => {
         if (!object) {
           setHoverInfo(null);
           return;
@@ -99,7 +177,16 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
             : Array.isArray(object.epc_list)
               ? object.epc_list.length
               : 0;
-        setHoverInfo({ x, y, text: `총 경로 수: ${count}` });
+        const cautionCount = Number(object.cautionCount ?? 0) || 0;
+        const errorCount = Number(object.errorCount ?? 0) || 0;
+        const sourceName = object.source_info?.name || 'Unknown';
+        const targetName = object.target_info?.name || 'Unknown';
+        setHoverInfo({
+          x,
+          y,
+          text: `${sourceName} -> ${targetName}\nCount: ${count}\nCaution: ${cautionCount}\nDanger: ${errorCount}`,
+        });
+        return;
       },
     });
     mapRef.current.addControl(overlay as any);
@@ -114,7 +201,7 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
 
   // --- 카메라 위치 조정 (경로를 위쪽으로 배치) ---
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !trackingPath || trackingPath.length < 2) return;
+    if (!mapReady || !mapRef.current || !trackingPath || trackingPath.length < 2 || trackingTime === null) return;
 
     const bounds = new LngLatBounds();
     const cleaned = trackingPath.filter((p) => isValidCoords(p.coords));
@@ -133,35 +220,16 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
       pitch: 45, 
       essential: true
     });
-  }, [mapReady, trackingPath, viewportPadding]);
+  }, [mapReady, trackingPath, trackingTime, viewportPadding]);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || resetToken == null) return;
-    const cleanedRoutes = filteredRoutes.filter(
-      (d) => isValidCoords(d?.source_info?.coords) && isValidCoords(d?.target_info?.coords)
-    );
-    const resetPadding = viewportPadding ?? 60;
-    if (cleanedRoutes.length === 0) {
-      mapRef.current.fitBounds(KOREA_BOUNDS, {
-        padding: resetPadding,
-        duration: 1200,
-        pitch: 50,
-        bearing: 0,
-        essential: true,
-      });
-      return;
-    }
-
-    const bounds = new LngLatBounds();
-    cleanedRoutes.forEach((route) => {
-      bounds.extend(route.source_info.coords);
-      bounds.extend(route.target_info.coords);
-    });
-    mapRef.current.fitBounds(bounds, {
-      padding: resetPadding,
-      duration: 1600,
-      pitch: 100,
+    if (!mapReady || !mapRef.current || resetToken == null || resetToken === 0) return;
+    mapRef.current.flyTo({
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
+      pitch: INITIAL_PITCH,
       bearing: 0,
+      duration: 1200,
       essential: true,
     });
   }, [mapReady, filteredRoutes, resetToken, viewportPadding]);
@@ -309,26 +377,62 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
       (d) => isValidCoords(d?.source_info?.coords) && isValidCoords(d?.target_info?.coords)
     );
     if (cleanedRoutes.length === 0) return [];
+    const nodeMap = new globalThis.Map<string, { position: [number, number]; label: string }>();
+    cleanedRoutes.forEach((route) => {
+      const sourceKey = `${route.source_info.id}:${route.source_info.coords[0]}:${route.source_info.coords[1]}`;
+      const targetKey = `${route.target_info.id}:${route.target_info.coords[0]}:${route.target_info.coords[1]}`;
+      if (!nodeMap.has(sourceKey)) {
+        nodeMap.set(sourceKey, { position: route.source_info.coords, label: route.source_info.name });
+      }
+      if (!nodeMap.has(targetKey)) {
+        nodeMap.set(targetKey, { position: route.target_info.coords, label: route.target_info.name });
+      }
+    });
+    const nodes = Array.from(nodeMap.values());
     return [
-        new ArcLayer({
-          id: 'global-arc-layer',
-          data: cleanedRoutes,
-          getSourcePosition: (d: RouteData) => d.source_info.coords,
-          getTargetPosition: (d: RouteData) => d.target_info.coords,
-          getSourceColor: [0, 180, 255],
-          getTargetColor: [0, 255, 150],
-        getWidth: (d: RouteData) => {
+      new ArcLayer<RouteData>({
+        id: 'global-route-arcs',
+        data: cleanedRoutes,
+        getSourcePosition: (d) => d.source_info.coords,
+        getTargetPosition: (d) => d.target_info.coords,
+        getSourceColor: (d) => getRouteColor(d),
+        getTargetColor: (d) => getRouteColor(d),
+        getWidth: (d) => {
           const count = d.count || 0;
           const weight = Math.sqrt(Math.max(count, 1));
-          return Math.min(4, 1 + weight * 2.2);
+          if (isEpcFocused) {
+            return Math.min(7.8, 2.6 + weight * 1.8);
+          }
+          return Math.min(5.8, 1.3 + weight * 0.3);
         },
-        getHeight: 0.6,
+        getHeight: (d) => {
+          if (d.source_info.id === d.target_info.id) return 0;
+          const count = d.count || 0;
+          const weight = Math.sqrt(Math.max(count, 1));
+          if (isEpcFocused) {
+            return Math.min(1.35, 0.24 + weight * 0.32);
+          }
+          return Math.min(0.6, 0.1 + weight * 0.022);
+        },
+        widthUnits: 'pixels',
+        opacity: 1,
         pickable: true,
         autoHighlight: true,
-        pickingRadius: 12,
-      })
+      }),
+      new ScatterplotLayer({
+        id: 'global-route-nodes',
+        data: nodes,
+        getPosition: (d: { position: [number, number] }) => d.position,
+        getFillColor: [14, 165, 233, 230],
+        getRadius: 5,
+        radiusUnits: 'pixels',
+        stroked: true,
+        getLineColor: [224, 242, 254, 220],
+        getLineWidth: 1,
+        pickable: true,
+      }),
     ];
-  }, [mapReady, filteredRoutes, trackingPath, trackingTime]);
+  }, [mapReady, filteredRoutes, trackingPath, trackingTime, isEpcFocused]);
 
   useEffect(() => {
     if (overlayRef.current) overlayRef.current.setProps({ layers });
@@ -336,7 +440,7 @@ export default function LogisticsMap({ epcFilter, routes, trackingPath, resetTok
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'absolute' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+      <div id={mapContainerIdRef.current} ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
       {hoverInfo && (
         <div
           style={{

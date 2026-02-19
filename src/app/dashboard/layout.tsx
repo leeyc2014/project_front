@@ -1,5 +1,5 @@
 ﻿"use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -12,16 +12,39 @@ const Icon = ({ path, className }: { path: string; className: string }) => (
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
-  const [selectedSubMenu, setSelectedSubMenu] = useState('종합 현황');
+  const [selectedSubMenu, setSelectedSubMenu] = useState('');
+  const [displayName, setDisplayName] = useState('—');
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const isDashboardHome = pathname === '/dashboard';
+
+  const clearTokenCookie = () => {
+    document.cookie = 'token=; Path=/; Max-Age=0; SameSite=Lax';
+  };
+
+  const getToken = () => {
+    if (typeof window === 'undefined') return '';
+    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
+    if (match) return decodeURIComponent(match[1]);
+    return sessionStorage.getItem('token') || '';
+  };
+
+  const decodeJwtName = (token: string) => {
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return '';
+      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized + '==='.slice((normalized.length + 3) % 4);
+      const json = atob(padded);
+      const data = JSON.parse(json);
+      return typeof data?.name === 'string' ? data.name : '';
+    } catch {
+      return '';
+    }
+  };
 
   const subMenus: { [key: string]: { name: string; href: string }[] } = {
-    dashboard: [
-      { name: '종합 현황', href: '/dashboard' },
-      { name: '실시간 감시', href: '/dashboard/dashboard2' },
-      { name: '위험 이력 분석', href: '#' },
-    ],
     report: [
       { name: '리포트 생성', href: '/dashboard/report/generate' },
       { name: '로그 업로드', href: '/dashboard/report/upload' },
@@ -36,14 +59,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     } else if (pathname.includes("/dashboard/report/generate")) {
       setSelectedMenu("report");
       setSelectedSubMenu("리포트 생성");
-    } else if (pathname === "/dashboard") {
+    } else if (pathname === ("/dashboard")) {
       setSelectedMenu("dashboard");
-      setSelectedSubMenu("종합 현황");
-    } else if (pathname.includes("/dashboard/dashboard2")) {
-      setSelectedMenu("dashboard");
-      setSelectedSubMenu("실시간 감시");
     }
   }, [pathname]); // pathname이 변할 때마다 즉각 실행
+
+  useEffect(() => {
+    const token = getToken();
+    const name = token ? decodeJwtName(token) : '';
+    setDisplayName(name || '—');
+  }, []);
 
   const handleSubMenuClick = (menuKey: string, sub: { name: string; href: string }) => {
     setSelectedMenu(menuKey);
@@ -56,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const handleSignOut = () => {
-    sessionStorage.removeItem("token");
+    clearTokenCookie();
     router.push("/");
   };
 
@@ -73,29 +98,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center space-x-12">
             <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">TEST</h1>
             <nav className="flex space-x-8 h-16">
-              {['dashboard', 'report'].map((menuKey) => (
-                <div key={menuKey} className="h-16 flex items-center">
-                  <button
-                    onMouseEnter={() => setHoveredMenu(menuKey)}
-                    onClick={() => {
-                      // 메인 메뉴 클릭 시 해당 카테고리의 첫 번째 서브메뉴로 이동하게 설정 가능
-                      setSelectedMenu(menuKey);
-                    }}
-                    className={`flex items-center font-bold px-1 transition-all ${selectedMenu === menuKey ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                  >
-                    {menuKey === 'dashboard' ? '대시보드' : '진단 리포트'}
-                    <Icon path="M19.5 8.25l-7.5 7.5-7.5-7.5" className={`ml-2 w-3 h-3 transition-transform ${hoveredMenu === menuKey ? 'rotate-180' : ''}`} />
-                  </button>
-                </div>
-              ))}
-              <Link href="#" className="flex items-center text-gray-400 hover:text-white font-medium px-1">시스템관리</Link>
+              <div className="h-16 flex items-center">
+                <Link
+                  href="/dashboard"
+                  onClick={() => {
+                    setSelectedMenu('dashboard');
+                    setHoveredMenu(null);
+                  }}
+                  className={`flex items-center font-bold px-1 transition-all ${
+                    selectedMenu === 'dashboard'
+                      ? 'border-blue-500 text-blue-500'
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  대시보드
+                </Link>
+              </div>
+              <div className="h-16 flex items-center">
+                <button
+                  onMouseEnter={() => {
+                    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+                    setHoveredMenu('report');
+                  }}
+                  onMouseLeave={() => {
+                    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+                    closeTimerRef.current = setTimeout(() => {
+                      setHoveredMenu(null);
+                    }, 120);
+                  }}
+                  onClick={() => setSelectedMenu('report')}
+                  className={`flex items-center font-bold px-1 transition-all ${selectedMenu === 'report' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-400 hover:text-white'
+                    }`}
+                >
+                  진단 리포트
+                  <Icon path="M19.5 8.25l-7.5 7.5-7.5-7.5" className={`ml-2 w-3 h-3 transition-transform ${hoveredMenu === 'report' ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
             </nav>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-right border-r border-gray-700 pr-4">
               <p className="text-[10px] text-gray-500 uppercase tracking-widest leading-none mb-1">Authenticated</p>
-              <p className="font-bold text-blue-400 text-sm leading-none">admin_01</p>
+              <p className="font-bold text-blue-400 text-sm leading-none">{displayName}</p>
             </div>
             <button className="p-2 hover:bg-gray-800 rounded-full transition-colors text-gray-400" onClick={handleSignOut}>
               <Icon path="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" className="w-5 h-5" />
@@ -105,14 +149,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* SECONDARY TAB (전체 영역 노출 + 텍스트만 각 탭 아래 정렬) */}
         <div
-          className={`absolute left-0 top-full w-full bg-gray-800 border-b border-blue-500/30 shadow-2xl overflow-hidden transition-all duration-200 ease-in-out ${hoveredMenu ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+          onMouseEnter={() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+            setHoveredMenu('report');
+          }}
+          onMouseLeave={() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = setTimeout(() => {
+              setHoveredMenu(null);
+            }, 120);
+          }}
+          className={`absolute left-0 top-full w-full bg-gray-800 border-b border-blue-500/30 shadow-2xl overflow-hidden transition-all duration-200 ease-in-out ${hoveredMenu === 'report' ? 'max-h-12 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
             }`}
         >
           <div className="h-12 flex items-center px-8">
             <div className="flex items-center space-x-12">
               <span className="text-xl font-black tracking-tighter text-blue-500 italic uppercase opacity-0 select-none">TEST</span>
               <div className="flex space-x-8 text-sm">
-                {['dashboard', 'report'].map((menuKey) => (
+                {['report'].map((menuKey) => (
                   <div key={menuKey} className="relative">
                     <span className="invisible font-bold px-1 pointer-events-none relative z-0">
                       {menuKey === 'dashboard' ? '대시보드' : '진단 리포트'}
@@ -150,27 +204,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* 2. MAIN CONTENT AREA (중요: 남은 공간 모두 차지) */}
       {/* Header(64px) + Footer(48px) = 112px를 제외한 높이 자동 계산 */}
-      <main className="flex-1 relative overflow-hidden bg-gray-100 p-4">
+      <main className={`flex-1 relative overflow-hidden bg-gray-100 ${isDashboardHome ? 'p-0' : 'p-4'}`}>
         <div className="h-full w-full">
           {children}
         </div>
       </main>
 
       {/* FOOTER (48px 고정) */}
-      <footer className="h-12 bg-gray-300 border-t border-gray-200 flex items-center justify-between px-8 z-10 flex-none">
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center text-[11px] text-gray-400">
-            <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-            SYSTEM OPERATIONAL
+      {!isDashboardHome && (
+        <footer className="h-12 bg-gray-300 border-t border-gray-200 flex items-center justify-between px-8 z-10 flex-none">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center text-[11px] text-gray-400">
+              <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+              SYSTEM OPERATIONAL
+            </div>
+            <p className="text-[11px] text-gray-500 border-l pl-6 border-gray-200">
+              2차원 바코드 기반 물류 공급망 불법 유통 분석 웹 서비스
+            </p>
           </div>
-          <p className="text-[11px] text-gray-500 border-l pl-6 border-gray-200">
-            2차원 바코드 기반 물류 공급망 불법 유통 분석 웹 서비스
+          <p className="text-[11px] font-medium text-gray-400 tracking-wider uppercase">
+            © 2026 TEST.
           </p>
-        </div>
-        <p className="text-[11px] font-medium text-gray-400 tracking-wider uppercase">
-          © 2026 TEST.
-        </p>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

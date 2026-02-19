@@ -14,21 +14,113 @@ export interface RiskItem {
     epcCode: string;
     scanLocation: string;
     locationId: string;
-    hubType: string;
-    businessStep: string;
     eventType: string;
     operatorId: string;
     deviceId: string;
     epcHeader: string;
     epcCompany: string;
     epcProduct: string;
-    epcLot: string;
+    productName?: string;
+    epcLot: number | null;
+    epcSerial: number | null;
     eventTime: string;
     manufactureDate: string;
     expiryDate: string;
+    detailIndex?: number;
     st: 'DANGER' | 'CAUTION' | 'SAFE';
-    msg: string;
-    location: string;
-    destination: string;
+    msg?: string;
+    aiCheck?: string;
+    ruleCheck?: string;
     path: PathPoint[]; // 지도 경로 데이터
 }
+
+export interface HubMoveStats {
+  fromLocationId: string;
+  toLocationId: string;
+  count: number;
+  errorCount: number;
+}
+
+export interface KPIResponse {
+  unregisteredEpc: number;
+  integrityErrorEpc: number;
+  clonedEpc: number;
+  duplicateEpc: number;
+  invalidHubMove: number;
+  impossibleSpeed: number;
+}
+
+export interface RiskyHub {
+  locationId: string;
+  count: number;
+  errorCount: number;
+}
+
+export interface RiskyEventType {
+  eventType: string;
+  count: number;
+  errorCount: number;
+}
+
+export interface DashboardResponse {
+  hubMoveStats: HubMoveStats[];
+  kpi: KPIResponse;
+  riskyHubs: RiskyHub[];
+  riskyEventTypes: RiskyEventType[];
+}
+
+export type FilterState = {
+  factoryLocationTypes: string[];
+  logisticCenterLocationTypes: string[];
+  salerLocationTypes: string[];
+  retailerLocationTypes: string[];
+  operatorIds: string[];
+  deviceIds: string[];
+  epcCompanies: string[];
+  epcProducts: string[];
+  epcCode: string;
+  epcLot: number | null;
+  epcSerial: number | null;
+  eventTimeStart: string;
+  eventTimeEnd: string;
+  manufactureDate: string;
+  expiryDate: string;
+};
+
+export type FilterOptions = {
+  factoryLocationTypes: { key: string; value: string }[];
+  logisticCenterLocationTypes: { key: string; value: string }[];
+  salerLocationTypes: { key: string; value: string }[];
+  retailerLocationTypes: { key: string; value: string }[];
+  operatorIds: { key: string; value: string }[];
+  deviceIds: { key: string; value: string }[];
+  epcCompanies: { key: string; value: string }[];
+  epcProducts: { key: string; value: string }[];
+};
+
+export const DEFAULT_FILTERS: FilterState = {
+  factoryLocationTypes: [],
+  logisticCenterLocationTypes: [],
+  salerLocationTypes: [],
+  retailerLocationTypes: [],
+  operatorIds: [],
+  deviceIds: [],
+  epcCompanies: [],
+  epcProducts: [],
+  epcCode: '',
+  epcLot: null,
+  epcSerial: null,
+  eventTimeStart: '',
+  eventTimeEnd: '',
+  manufactureDate: '',
+  expiryDate: '',
+};
+
+export const CHART_COLORS = {
+  blue: '#3b82f6',
+  orange: '#f97316',
+  green: '#22c55e',
+  red: '#ef4444',
+  purple: '#8b5cf6',
+  teal: '#14b8a6',
+};

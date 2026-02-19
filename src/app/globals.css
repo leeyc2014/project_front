@@ -24,3 +24,48 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes serialEnter {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes serialLeave {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(24px); }
+}
+
+@keyframes chartsEnter {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chartsLeave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(24px); }
+}
+
+@keyframes filterEnter {
+  from { transform: translateX(-24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes filterLeave {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-24px); opacity: 0; }
+}
+
+.serial-shown { opacity: 1; transform: translateX(0); }
+.serial-hidden { opacity: 0; transform: translateX(24px); pointer-events: none; }
+.serial-enter { animation: serialEnter 300ms ease forwards; }
+.serial-leave { animation: serialLeave 300ms ease forwards; }
+
+.charts-shown { opacity: 1; transform: translateY(0); }
+.charts-hidden { opacity: 0; transform: translateY(24px); pointer-events: none; }
+.charts-enter { animation: chartsEnter 300ms ease forwards; }
+.charts-leave { animation: chartsLeave 300ms ease forwards; }
+
+.filter-shown { opacity: 1; transform: translateX(0); }
+.filter-hidden { opacity: 0; transform: translateX(-24px); pointer-events: none; }
+.filter-enter { animation: filterEnter 300ms ease forwards; }
+.filter-leave { animation: filterLeave 300ms ease forwards; }

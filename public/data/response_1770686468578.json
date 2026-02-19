@@ -1,0 +1,1238 @@
+{
+  "filters": {
+    "factoryLocationList": [
+      {
+        "id": 1,
+        "label": "인천공장"
+      },
+      {
+        "id": 2,
+        "label": "화성공장"
+      },
+      {
+        "id": 3,
+        "label": "양산공장"
+      },
+      {
+        "id": 4,
+        "label": "구미공장"
+      }
+    ],
+    "logisticCenterLocationList": [
+      {
+        "id": 13,
+        "label": "수도권물류센터"
+      },
+      {
+        "id": 15,
+        "label": "전북물류센터"
+      },
+      {
+        "id": 17,
+        "label": "전남물류센터"
+      },
+      {
+        "id": 19,
+        "label": "경북물류센터"
+      }
+    ],
+    "salerLocationList": [
+      {
+        "id": 23,
+        "label": "수도권_도매상1"
+      },
+      {
+        "id": 25,
+        "label": "수도권_도매상2"
+      },
+      {
+        "id": 27,
+        "label": "수도권_도매상3"
+      },
+      {
+        "id": 29,
+        "label": "전북_도매상1"
+      },
+      {
+        "id": 31,
+        "label": "전북_도매상2"
+      },
+      {
+        "id": 33,
+        "label": "전북_도매상3"
+      },
+      {
+        "id": 35,
+        "label": "전남_도매상1"
+      },
+      {
+        "id": 39,
+        "label": "전남_도매상3"
+      },
+      {
+        "id": 41,
+        "label": "경북_도매상1"
+      },
+      {
+        "id": 43,
+        "label": "경북_도매상2"
+      }
+    ],
+    "retailerLocationList": [
+      {
+        "id": 53,
+        "label": "수도권_도매상1_권역_소매상1"
+      },
+      {
+        "id": 56,
+        "label": "수도권_도매상1_권역_소매상2"
+      },
+      {
+        "id": 59,
+        "label": "수도권_도매상1_권역_소매상3"
+      },
+      {
+        "id": 62,
+        "label": "수도권_도매상2_권역_소매상1"
+      },
+      {
+        "id": 65,
+        "label": "수도권_도매상2_권역_소매상2"
+      },
+      {
+        "id": 68,
+        "label": "수도권_도매상2_권역_소매상3"
+      },
+      {
+        "id": 71,
+        "label": "수도권_도매상3_권역_소매상1"
+      },
+      {
+        "id": 74,
+        "label": "수도권_도매상3_권역_소매상2"
+      },
+      {
+        "id": 77,
+        "label": "수도권_도매상3_권역_소매상3"
+      },
+      {
+        "id": 80,
+        "label": "전북_도매상1_권역_소매상1"
+      },
+      {
+        "id": 83,
+        "label": "전북_도매상1_권역_소매상2"
+      },
+      {
+        "id": 86,
+        "label": "전북_도매상1_권역_소매상3"
+      },
+      {
+        "id": 89,
+        "label": "전북_도매상2_권역_소매상1"
+      },
+      {
+        "id": 92,
+        "label": "전북_도매상2_권역_소매상2"
+      },
+      {
+        "id": 95,
+        "label": "전북_도매상2_권역_소매상3"
+      },
+      {
+        "id": 98,
+        "label": "전북_도매상3_권역_소매상1"
+      },
+      {
+        "id": 101,
+        "label": "전북_도매상3_권역_소매상2"
+      },
+      {
+        "id": 104,
+        "label": "전북_도매상3_권역_소매상3"
+      },
+      {
+        "id": 107,
+        "label": "전남_도매상1_권역_소매상1"
+      },
+      {
+        "id": 110,
+        "label": "전남_도매상1_권역_소매상2"
+      },
+      {
+        "id": 113,
+        "label": "전남_도매상1_권역_소매상3"
+      },
+      {
+        "id": 116,
+        "label": "전남_도매상2_권역_소매상1"
+      },
+      {
+        "id": 119,
+        "label": "전남_도매상2_권역_소매상2"
+      },
+      {
+        "id": 122,
+        "label": "전남_도매상2_권역_소매상3"
+      },
+      {
+        "id": 125,
+        "label": "전남_도매상3_권역_소매상1"
+      },
+      {
+        "id": 128,
+        "label": "전남_도매상3_권역_소매상2"
+      },
+      {
+        "id": 131,
+        "label": "전남_도매상3_권역_소매상3"
+      },
+      {
+        "id": 134,
+        "label": "경북_도매상1_권역_소매상1"
+      },
+      {
+        "id": 137,
+        "label": "경북_도매상1_권역_소매상2"
+      },
+      {
+        "id": 140,
+        "label": "경북_도매상1_권역_소매상3"
+      },
+      {
+        "id": 143,
+        "label": "경북_도매상2_권역_소매상1"
+      },
+      {
+        "id": 146,
+        "label": "경북_도매상2_권역_소매상2"
+      },
+      {
+        "id": 149,
+        "label": "경북_도매상2_권역_소매상3"
+      },
+      {
+        "id": 152,
+        "label": "경북_도매상3_권역_소매상1"
+      },
+      {
+        "id": 155,
+        "label": "경북_도매상3_권역_소매상2"
+      },
+      {
+        "id": 158,
+        "label": "경북_도매상3_권역_소매상3"
+      }
+    ],
+    "operatorList": [
+      {
+        "id": 1,
+        "label": "작업자 1"
+      },
+      {
+        "id": 2,
+        "label": "작업자 2"
+      },
+      {
+        "id": 3,
+        "label": "작업자 3"
+      },
+      {
+        "id": 4,
+        "label": "작업자 4"
+      },
+      {
+        "id": 5,
+        "label": "작업자 5"
+      },
+      {
+        "id": 7,
+        "label": "작업자 7"
+      },
+      {
+        "id": 9,
+        "label": "작업자 9"
+      },
+      {
+        "id": 11,
+        "label": "작업자 11"
+      },
+      {
+        "id": 13,
+        "label": "작업자 13"
+      },
+      {
+        "id": 15,
+        "label": "작업자 15"
+      },
+      {
+        "id": 17,
+        "label": "작업자 17"
+      },
+      {
+        "id": 19,
+        "label": "작업자 19"
+      },
+      {
+        "id": 23,
+        "label": "작업자 23"
+      },
+      {
+        "id": 25,
+        "label": "작업자 25"
+      },
+      {
+        "id": 27,
+        "label": "작업자 27"
+      },
+      {
+        "id": 29,
+        "label": "작업자 29"
+      },
+      {
+        "id": 31,
+        "label": "작업자 31"
+      },
+      {
+        "id": 33,
+        "label": "작업자 33"
+      },
+      {
+        "id": 35,
+        "label": "작업자 35"
+      },
+      {
+        "id": 39,
+        "label": "작업자 39"
+      },
+      {
+        "id": 41,
+        "label": "작업자 41"
+      },
+      {
+        "id": 43,
+        "label": "작업자 43"
+      },
+      {
+        "id": 53,
+        "label": "작업자 53"
+      },
+      {
+        "id": 56,
+        "label": "작업자 56"
+      },
+      {
+        "id": 59,
+        "label": "작업자 59"
+      },
+      {
+        "id": 62,
+        "label": "작업자 62"
+      },
+      {
+        "id": 65,
+        "label": "작업자 65"
+      },
+      {
+        "id": 68,
+        "label": "작업자 68"
+      },
+      {
+        "id": 71,
+        "label": "작업자 71"
+      },
+      {
+        "id": 74,
+        "label": "작업자 74"
+      },
+      {
+        "id": 77,
+        "label": "작업자 77"
+      },
+      {
+        "id": 80,
+        "label": "작업자 80"
+      },
+      {
+        "id": 83,
+        "label": "작업자 83"
+      },
+      {
+        "id": 86,
+        "label": "작업자 86"
+      },
+      {
+        "id": 89,
+        "label": "작업자 89"
+      },
+      {
+        "id": 92,
+        "label": "작업자 92"
+      },
+      {
+        "id": 95,
+        "label": "작업자 95"
+      },
+      {
+        "id": 98,
+        "label": "작업자 98"
+      },
+      {
+        "id": 101,
+        "label": "작업자 101"
+      },
+      {
+        "id": 104,
+        "label": "작업자 104"
+      },
+      {
+        "id": 107,
+        "label": "작업자 107"
+      },
+      {
+        "id": 110,
+        "label": "작업자 110"
+      },
+      {
+        "id": 113,
+        "label": "작업자 113"
+      },
+      {
+        "id": 116,
+        "label": "작업자 116"
+      },
+      {
+        "id": 119,
+        "label": "작업자 119"
+      },
+      {
+        "id": 122,
+        "label": "작업자 122"
+      },
+      {
+        "id": 125,
+        "label": "작업자 125"
+      },
+      {
+        "id": 128,
+        "label": "작업자 128"
+      },
+      {
+        "id": 131,
+        "label": "작업자 131"
+      },
+      {
+        "id": 134,
+        "label": "작업자 134"
+      },
+      {
+        "id": 137,
+        "label": "작업자 137"
+      },
+      {
+        "id": 140,
+        "label": "작업자 140"
+      },
+      {
+        "id": 143,
+        "label": "작업자 143"
+      },
+      {
+        "id": 146,
+        "label": "작업자 146"
+      },
+      {
+        "id": 149,
+        "label": "작업자 149"
+      },
+      {
+        "id": 152,
+        "label": "작업자 152"
+      },
+      {
+        "id": 155,
+        "label": "작업자 155"
+      },
+      {
+        "id": 158,
+        "label": "작업자 158"
+      }
+    ],
+    "deviceList": [
+      {
+        "id": 1,
+        "label": "장비 1"
+      },
+      {
+        "id": 2,
+        "label": "장비 2"
+      },
+      {
+        "id": 3,
+        "label": "장비 3"
+      },
+      {
+        "id": 4,
+        "label": "장비 4"
+      },
+      {
+        "id": 5,
+        "label": "장비 5"
+      },
+      {
+        "id": 7,
+        "label": "장비 7"
+      },
+      {
+        "id": 9,
+        "label": "장비 9"
+      },
+      {
+        "id": 11,
+        "label": "장비 11"
+      },
+      {
+        "id": 13,
+        "label": "장비 13"
+      },
+      {
+        "id": 15,
+        "label": "장비 15"
+      },
+      {
+        "id": 17,
+        "label": "장비 17"
+      },
+      {
+        "id": 19,
+        "label": "장비 19"
+      },
+      {
+        "id": 23,
+        "label": "장비 23"
+      },
+      {
+        "id": 25,
+        "label": "장비 25"
+      },
+      {
+        "id": 27,
+        "label": "장비 27"
+      },
+      {
+        "id": 29,
+        "label": "장비 29"
+      },
+      {
+        "id": 31,
+        "label": "장비 31"
+      },
+      {
+        "id": 33,
+        "label": "장비 33"
+      },
+      {
+        "id": 35,
+        "label": "장비 35"
+      },
+      {
+        "id": 39,
+        "label": "장비 39"
+      },
+      {
+        "id": 41,
+        "label": "장비 41"
+      },
+      {
+        "id": 43,
+        "label": "장비 43"
+      },
+      {
+        "id": 53,
+        "label": "장비 53"
+      },
+      {
+        "id": 56,
+        "label": "장비 56"
+      },
+      {
+        "id": 59,
+        "label": "장비 59"
+      },
+      {
+        "id": 62,
+        "label": "장비 62"
+      },
+      {
+        "id": 65,
+        "label": "장비 65"
+      },
+      {
+        "id": 68,
+        "label": "장비 68"
+      },
+      {
+        "id": 71,
+        "label": "장비 71"
+      },
+      {
+        "id": 74,
+        "label": "장비 74"
+      },
+      {
+        "id": 77,
+        "label": "장비 77"
+      },
+      {
+        "id": 80,
+        "label": "장비 80"
+      },
+      {
+        "id": 83,
+        "label": "장비 83"
+      },
+      {
+        "id": 86,
+        "label": "장비 86"
+      },
+      {
+        "id": 89,
+        "label": "장비 89"
+      },
+      {
+        "id": 92,
+        "label": "장비 92"
+      },
+      {
+        "id": 95,
+        "label": "장비 95"
+      },
+      {
+        "id": 98,
+        "label": "장비 98"
+      },
+      {
+        "id": 101,
+        "label": "장비 101"
+      },
+      {
+        "id": 104,
+        "label": "장비 104"
+      },
+      {
+        "id": 107,
+        "label": "장비 107"
+      },
+      {
+        "id": 110,
+        "label": "장비 110"
+      },
+      {
+        "id": 113,
+        "label": "장비 113"
+      },
+      {
+        "id": 116,
+        "label": "장비 116"
+      },
+      {
+        "id": 119,
+        "label": "장비 119"
+      },
+      {
+        "id": 122,
+        "label": "장비 122"
+      },
+      {
+        "id": 125,
+        "label": "장비 125"
+      },
+      {
+        "id": 128,
+        "label": "장비 128"
+      },
+      {
+        "id": 131,
+        "label": "장비 131"
+      },
+      {
+        "id": 134,
+        "label": "장비 134"
+      },
+      {
+        "id": 137,
+        "label": "장비 137"
+      },
+      {
+        "id": 140,
+        "label": "장비 140"
+      },
+      {
+        "id": 143,
+        "label": "장비 143"
+      },
+      {
+        "id": 146,
+        "label": "장비 146"
+      },
+      {
+        "id": 149,
+        "label": "장비 149"
+      },
+      {
+        "id": 152,
+        "label": "장비 152"
+      },
+      {
+        "id": 155,
+        "label": "장비 155"
+      },
+      {
+        "id": 158,
+        "label": "장비 158"
+      }
+    ],
+    "companyList": [
+      {
+        "id": 8804823,
+        "label": "업체 1"
+      },
+      {
+        "id": 8805843,
+        "label": "업체 2"
+      },
+      {
+        "id": 8809437,
+        "label": "업체 3"
+      }
+    ],
+    "productList": [
+      {
+        "id": 2932031,
+        "label": "Product 1"
+      },
+      {
+        "id": 1203199,
+        "label": "Product 2"
+      },
+      {
+        "id": 3812382,
+        "label": "Product 3"
+      },
+      {
+        "id": 1293291,
+        "label": "Product 4"
+      },
+      {
+        "id": 1240424,
+        "label": "Product 5"
+      },
+      {
+        "id": 3842332,
+        "label": "Product 6"
+      },
+      {
+        "id": 4282032,
+        "label": "Product 7"
+      },
+      {
+        "id": 2190354,
+        "label": "Product 8"
+      },
+      {
+        "id": 1059560,
+        "label": "Product 9"
+      },
+      {
+        "id": 102313,
+        "label": "Product 10"
+      },
+      {
+        "id": 2031932,
+        "label": "Product 11"
+      },
+      {
+        "id": 1424444,
+        "label": "Product 12"
+      },
+      {
+        "id": 1232127,
+        "label": "Product 13"
+      },
+      {
+        "id": 2031921,
+        "label": "Product 14"
+      },
+      {
+        "id": 1239213,
+        "label": "Product 15"
+      }
+    ]
+  },
+  "locationList": [
+    {
+      "locationId": 1,
+      "locationName": "인천공장",
+      "initial": "ICN",
+      "longtitude": 37.4751578,
+      "latitude": 126.6312666,
+      "type": "Factory"
+    },
+    {
+      "locationId": 2,
+      "locationName": "화성공장",
+      "initial": "HWS",
+      "longtitude": 37.1688927,
+      "latitude": 126.8941169,
+      "type": "Factory"
+    },
+    {
+      "locationId": 3,
+      "locationName": "양산공장",
+      "initial": "YGS",
+      "longtitude": 35.3537542,
+      "latitude": 129.0432396,
+      "type": "Factory"
+    },
+    {
+      "locationId": 4,
+      "locationName": "구미공장",
+      "initial": "KUM",
+      "longtitude": 36.1172459,
+      "latitude": 128.3509342,
+      "type": "Factory"
+    },
+    {
+      "locationId": 5,
+      "locationName": "인천공장창고",
+      "initial": "ICN",
+      "longtitude": 37.4751578,
+      "latitude": 126.6312666,
+      "type": "Warehouse"
+    },
+    {
+      "locationId": 7,
+      "locationName": "화성공장창고",
+      "initial": "HWS",
+      "longtitude": 37.1688927,
+      "latitude": 126.8941169,
+      "type": "Warehouse"
+    },
+    {
+      "locationId": 9,
+      "locationName": "양산공장창고",
+      "initial": "YGS",
+      "longtitude": 35.3537542,
+      "latitude": 129.0432396,
+      "type": "Warehouse"
+    },
+    {
+      "locationId": 11,
+      "locationName": "구미공장창고",
+      "initial": "KUM",
+      "longtitude": 36.1172459,
+      "latitude": 128.3509342,
+      "type": "Warehouse"
+    },
+    {
+      "locationId": 13,
+      "locationName": "수도권물류센터",
+      "initial": "SEL",
+      "longtitude": 37.4154308,
+      "latitude": 126.8788253,
+      "type": "LogisticCenter"
+    },
+    {
+      "locationId": 15,
+      "locationName": "전북물류센터",
+      "initial": "JB",
+      "longtitude": 35.8210731,
+      "latitude": 127.1101841,
+      "type": "LogisticCenter"
+    },
+    {
+      "locationId": 17,
+      "locationName": "전남물류센터",
+      "initial": "JN",
+      "longtitude": 35.148217,
+      "latitude": 126.8475582,
+      "type": "LogisticCenter"
+    },
+    {
+      "locationId": 19,
+      "locationName": "경북물류센터",
+      "initial": "KB",
+      "longtitude": 36.0759336,
+      "latitude": 128.3769277,
+      "type": "LogisticCenter"
+    },
+    {
+      "locationId": 23,
+      "locationName": "수도권_도매상1",
+      "initial": "SEL",
+      "longtitude": 37.2894451,
+      "latitude": 127.1065148,
+      "type": "Saler"
+    },
+    {
+      "locationId": 25,
+      "locationName": "수도권_도매상2",
+      "initial": "SEL",
+      "longtitude": 37.3237979,
+      "latitude": 126.960342,
+      "type": "Saler"
+    },
+    {
+      "locationId": 27,
+      "locationName": "수도권_도매상3",
+      "initial": "SEL",
+      "longtitude": 37.786547,
+      "latitude": 127.0483729,
+      "type": "Saler"
+    },
+    {
+      "locationId": 29,
+      "locationName": "전북_도매상1",
+      "initial": "JB",
+      "longtitude": 35.8082312,
+      "latitude": 126.881447,
+      "type": "Saler"
+    },
+    {
+      "locationId": 31,
+      "locationName": "전북_도매상2",
+      "initial": "JB",
+      "longtitude": 35.7809899,
+      "latitude": 127.429376,
+      "type": "Saler"
+    },
+    {
+      "locationId": 33,
+      "locationName": "전북_도매상3",
+      "initial": "JB",
+      "longtitude": 35.3721243,
+      "latitude": 127.1412631,
+      "type": "Saler"
+    },
+    {
+      "locationId": 35,
+      "locationName": "전남_도매상1",
+      "initial": "JN",
+      "longtitude": 34.7089005,
+      "latitude": 126.9052181,
+      "type": "Saler"
+    },
+    {
+      "locationId": 39,
+      "locationName": "전남_도매상3",
+      "initial": "JN",
+      "longtitude": 35.1642151,
+      "latitude": 126.9094346,
+      "type": "Saler"
+    },
+    {
+      "locationId": 41,
+      "locationName": "경북_도매상1",
+      "initial": "KB",
+      "longtitude": 36.3535525,
+      "latitude": 128.6969601,
+      "type": "Saler"
+    },
+    {
+      "locationId": 43,
+      "locationName": "경북_도매상2",
+      "initial": "KB",
+      "longtitude": 36.6467331,
+      "latitude": 128.4382302,
+      "type": "Saler"
+    },
+    {
+      "locationId": 53,
+      "locationName": "수도권_도매상1_권역_소매상1",
+      "initial": "SEL",
+      "longtitude": 37.2701285,
+      "latitude": 127.1046836,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 56,
+      "locationName": "수도권_도매상1_권역_소매상2",
+      "initial": "SEL",
+      "longtitude": 37.279668,
+      "latitude": 127.0718614,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 59,
+      "locationName": "수도권_도매상1_권역_소매상3",
+      "initial": "SEL",
+      "longtitude": 37.281033,
+      "latitude": 127.1526899,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 62,
+      "locationName": "수도권_도매상2_권역_소매상1",
+      "initial": "SEL",
+      "longtitude": 37.3298464,
+      "latitude": 126.9444518,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 65,
+      "locationName": "수도권_도매상2_권역_소매상2",
+      "initial": "SEL",
+      "longtitude": 37.3347574,
+      "latitude": 126.9704468,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 68,
+      "locationName": "수도권_도매상2_권역_소매상3",
+      "initial": "SEL",
+      "longtitude": 37.3010197,
+      "latitude": 126.960354,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 71,
+      "locationName": "수도권_도매상3_권역_소매상1",
+      "initial": "SEL",
+      "longtitude": 37.7719877,
+      "latitude": 127.047637,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 74,
+      "locationName": "수도권_도매상3_권역_소매상2",
+      "initial": "SEL",
+      "longtitude": 37.7882852,
+      "latitude": 127.0191294,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 77,
+      "locationName": "수도권_도매상3_권역_소매상3",
+      "initial": "SEL",
+      "longtitude": 37.7892746,
+      "latitude": 127.0707172,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 80,
+      "locationName": "전북_도매상1_권역_소매상1",
+      "initial": "JB",
+      "longtitude": 35.753971,
+      "latitude": 126.8461461,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 83,
+      "locationName": "전북_도매상1_권역_소매상2",
+      "initial": "JB",
+      "longtitude": 35.77136,
+      "latitude": 126.942371,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 86,
+      "locationName": "전북_도매상1_권역_소매상3",
+      "initial": "JB",
+      "longtitude": 35.8175166,
+      "latitude": 127.0216552,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 89,
+      "locationName": "전북_도매상2_권역_소매상1",
+      "initial": "JB",
+      "longtitude": 35.7564435,
+      "latitude": 127.5113307,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 92,
+      "locationName": "전북_도매상2_권역_소매상2",
+      "initial": "JB",
+      "longtitude": 35.77898,
+      "latitude": 127.3359296,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 95,
+      "locationName": "전북_도매상2_권역_소매상3",
+      "initial": "JB",
+      "longtitude": 35.9274682,
+      "latitude": 127.4372582,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 98,
+      "locationName": "전북_도매상3_권역_소매상1",
+      "initial": "JB",
+      "longtitude": 35.3535395,
+      "latitude": 127.2243166,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 101,
+      "locationName": "전북_도매상3_권역_소매상2",
+      "initial": "JB",
+      "longtitude": 35.3155862,
+      "latitude": 127.146795,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 104,
+      "locationName": "전북_도매상3_권역_소매상3",
+      "initial": "JB",
+      "longtitude": 35.3548806,
+      "latitude": 127.0708201,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 107,
+      "locationName": "전남_도매상1_권역_소매상1",
+      "initial": "JN",
+      "longtitude": 34.68438,
+      "latitude": 126.9031508,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 110,
+      "locationName": "전남_도매상1_권역_소매상2",
+      "initial": "JN",
+      "longtitude": 34.7414909,
+      "latitude": 126.8988909,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 113,
+      "locationName": "전남_도매상1_권역_소매상3",
+      "initial": "JN",
+      "longtitude": 34.7245008,
+      "latitude": 126.9432817,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 116,
+      "locationName": "전남_도매상2_권역_소매상1",
+      "initial": "JN",
+      "longtitude": 34.7405344,
+      "latitude": 126.5068238,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 119,
+      "locationName": "전남_도매상2_권역_소매상2",
+      "initial": "JN",
+      "longtitude": 34.7317238,
+      "latitude": 126.5404183,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 122,
+      "locationName": "전남_도매상2_권역_소매상3",
+      "initial": "JN",
+      "longtitude": 34.7910457,
+      "latitude": 126.5149148,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 125,
+      "locationName": "전남_도매상3_권역_소매상1",
+      "initial": "JN",
+      "longtitude": 35.1405729,
+      "latitude": 126.9231552,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 128,
+      "locationName": "전남_도매상3_권역_소매상2",
+      "initial": "JN",
+      "longtitude": 35.1517964,
+      "latitude": 126.890133,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 131,
+      "locationName": "전남_도매상3_권역_소매상3",
+      "initial": "JN",
+      "longtitude": 35.1823785,
+      "latitude": 126.8994018,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 134,
+      "locationName": "경북_도매상1_권역_소매상1",
+      "initial": "KB",
+      "longtitude": 36.3441484,
+      "latitude": 128.6685988,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 137,
+      "locationName": "경북_도매상1_권역_소매상2",
+      "initial": "KB",
+      "longtitude": 36.3171336,
+      "latitude": 128.762797,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 140,
+      "locationName": "경북_도매상1_권역_소매상3",
+      "initial": "KB",
+      "longtitude": 36.4169766,
+      "latitude": 128.6772908,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 143,
+      "locationName": "경북_도매상2_권역_소매상1",
+      "initial": "KB",
+      "longtitude": 36.6114111,
+      "latitude": 128.352093,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 146,
+      "locationName": "경북_도매상2_권역_소매상2",
+      "initial": "KB",
+      "longtitude": 36.5811446,
+      "latitude": 128.5188838,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 149,
+      "locationName": "경북_도매상2_권역_소매상3",
+      "initial": "KB",
+      "longtitude": 36.7197067,
+      "latitude": 128.5287712,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 152,
+      "locationName": "경북_도매상3_권역_소매상1",
+      "initial": "KB",
+      "longtitude": 36.381536,
+      "latitude": 129.3582894,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 155,
+      "locationName": "경북_도매상3_권역_소매상2",
+      "initial": "KB",
+      "longtitude": 36.3843568,
+      "latitude": 129.3023946,
+      "type": "Retailer"
+    },
+    {
+      "locationId": 158,
+      "locationName": "경북_도매상3_권역_소매상3",
+      "initial": "KB",
+      "longtitude": 36.3507726,
+      "latitude": 129.2796638,
+      "type": "Retailer"
+    }
+  ]
+}
