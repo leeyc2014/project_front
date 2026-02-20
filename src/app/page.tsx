@@ -1,5 +1,8 @@
 "use client";
 
+import { loginUserAtom } from '@/atoms/atom';
+import { User } from '@/types/user';
+import { useAtom } from 'jotai';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useEffect, useRef } from "react";
 
@@ -16,20 +19,13 @@ const LockIcon = () => (
     </svg>
 );
 
-// --- Types ---
-export type User = {
-    id: string;
-    name: string;
-    role: 'USER';
-};
-
 export default function Page() {
     // 백엔드 LoginRequest DTO의 필드명 'name'과 맞추기 위해 ref 명칭 정리
     const idInputRef = useRef<HTMLInputElement>(null);
     const passwordInputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
 
-    const [loginUser, setLoginUser] = useState<User | null>(null);
+    const [loginUser, setLoginUser] = useAtom<User | null>(loginUserAtom);
     const [loginState, setLoginState] = useState<boolean | null>(null);
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
@@ -81,6 +77,7 @@ export default function Page() {
                 if (result.token) {
                     setTokenCookie(result.token);
                 }
+                setLoginUser(result);
 
                 // 대시보드로 이동
                 router.push(`/dashboard?${defaultDashboardQuery}`);

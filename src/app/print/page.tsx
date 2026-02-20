@@ -263,7 +263,7 @@ function PrintReportContent() {
 
           {/* 유형별 진단 */}
           <section>
-            <h2 className="text-lg font-bold mb-2">유형별 진단</h2>
+            <h2 className="text-lg font-bold mb-2 text-red-700">유형별 진단 (위험)</h2>
             <table className="w-full border-collapse border border-black text-sm">
               <thead className="bg-gray-50 text-center">
                 <tr>
