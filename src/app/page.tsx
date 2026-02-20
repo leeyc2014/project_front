@@ -33,7 +33,6 @@ export default function Page() {
     const setTokenCookie = (token: string) => {
         const secure = typeof window !== 'undefined' && window.location.protocol == 'https:' ? '; Secure' : '';
         document.cookie = `token=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
-        sessionStorage.setItem('token', token);
     };
 
 

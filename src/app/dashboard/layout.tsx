@@ -14,11 +14,12 @@ const Icon = ({ path, className }: { path: string; className: string }) => (
 );
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [loginUser, setLoginUser] = useAtom<User | null>(loginUserAtom);
+  const [loginUser] = useAtom<User | null>(loginUserAtom);
 
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
   const [displayName, setDisplayName] = useState('—');
+  const [isAuthorized, setIsAuthorized] = useState(true);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -50,7 +51,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const clearTokenCookie = () => {
     document.cookie = 'token=; Path=/; Max-Age=0; SameSite=Lax';
+    sessionStorage.removeItem('token');
   };
+
+  const hasAuthToken = () => {
+    const hasCookieToken = document.cookie
+      .split(';')
+      .some((cookie) => cookie.trim().startsWith('token='));
+    const hasSessionToken = Boolean(sessionStorage.getItem('token'));
+    return hasCookieToken || hasSessionToken;
+  };
+
+  useEffect(() => {
+    if (!hasAuthToken()) {
+      setIsAuthorized(false);
+      alert('\uB85C\uADF8\uC778 \uC774\uD6C4 \uC0AC\uC6A9 \uAC00\uB2A5\uD569\uB2C8\uB2E4.');
+      router.replace('/');
+      return;
+    }
+    setIsAuthorized(true);
+  }, [pathname, router]);
 
   useEffect(() => {
     if (pathname.includes("/dashboard/report")) {
@@ -64,12 +84,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     setDisplayName(loginUser?.name || '—')
-  }, [pathname]);
+  }, [loginUser]);
 
   const handleSignOut = () => {
     clearTokenCookie();
     router.push("/");
   };
+
+  if (!isAuthorized) return null;
 
   return (
     // 1. 전체 높이를 100vh로 고정하고 overflow-hidden 부여
