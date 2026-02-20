@@ -34,7 +34,6 @@ const KPI_LABELS = [
 ] as const;
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  AGGRGATION: '공장',
   AGGREGATION: '공장',
   WMS_INBOUND: '공장창고(In)',
   WMS_OUTBOUND: '공장창고(Out)',
@@ -262,8 +261,6 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
 
       const topHubsByDefect = Object.entries(aggregated)
         .sort((a, b) => {
-          const totalDiff = (b[1].caution + b[1].error) - (a[1].caution + a[1].error);
-          if (totalDiff !== 0) return totalDiff;
           const errorDiff = b[1].error - a[1].error;
           if (errorDiff !== 0) return errorDiff;
           return a[0].localeCompare(b[0], undefined, { numeric: true });
@@ -320,16 +317,41 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
         { name: 'Error Count', data: errorPoints },
         { name: 'Caution Count', data: cautionPoints },
       ],
-      options: buildBarOptions(categories, 'Defect Count', undefined, {
-        compact: true,
-        xLabelRotate: -45,
-        xLabelMaxHeight: 80,
-        dataLabelsEnabled: true,
-        stacked: true,
-        showStackTotal: true,
-        columnWidth: '50%',
-        colors: ['#ef4444', '#facc15'],
-      }),
+      options: {
+        ...buildBarOptions(categories, 'Defect Count', undefined, {
+          compact: true,
+          xLabelRotate: -45,
+          xLabelMaxHeight: 80,
+          dataLabelsEnabled: false,
+          stacked: true,
+          showStackTotal: true,
+          columnWidth: '50%',
+          colors: ['#ef4444', '#facc15'],
+        }),
+        tooltip: {
+          theme: 'dark',
+          shared: true,
+          intersect: false,
+          custom: ({ dataPointIndex, w }: any) => {
+            const category = w?.globals?.labels?.[dataPointIndex] ?? '';
+            const error = w?.config?.series?.[0]?.data?.[dataPointIndex] ?? 0;
+            const caution = w?.config?.series?.[1]?.data?.[dataPointIndex] ?? 0;
+            return `
+              <div style="padding:8px 10px;font-size:11px;">
+                <div style="font-weight:700;margin-bottom:4px;">${category}</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="width:8px;height:8px;background:#facc15;border-radius:2px;display:inline-block;"></span>
+                  <span>Caution Count: ${caution}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="width:8px;height:8px;background:#ef4444;border-radius:2px;display:inline-block;"></span>
+                  <span>Error Count: ${error}</span>
+                </div>
+              </div>
+            `;
+          },
+        },
+      },
       emptyLabel: 'No event type data',
     };
   }, [data, hubLocationMap, variant]);
@@ -357,7 +379,7 @@ export function EpcTimelineModal({
   const serialLabel = useMemo(() => {
     const first = events.find((event) => event != null);
     if (!first) return serial || '-';
-    const productName = first?.productName || first?.epcProduct || '-';
+    const productName = first?.productName || '-';
     const lot = first?.epcLot ?? '-';
     const epcSerial = first?.epcSerial ?? '-';
     return `${productName}(LOT: ${lot}, SERIAL: ${epcSerial})`;

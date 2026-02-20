@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { RiskItem } from '@/types/dashboard';
 import {convertMessage} from '@/utils/aiMessageUtil';
+import { useAtom } from 'jotai';
+import { User } from '@/types/user';
+import { loginUserAtom } from '@/atoms/atom';
 
 type SerialListProps = {
   page: number;
@@ -32,6 +35,7 @@ type ReportAnomalyByLocation = {
   location: string;
   messages: { text: string; severity: ReportSeverity }[];
 }[];
+
 
 const InspectionForm: React.FC<InspectionFormProps> = ({
   isOpen,
@@ -176,6 +180,7 @@ const SerialList: React.FC<SerialListProps> = ({
   totalElements = 0,
   onPageChange,
 }) => {
+  const [loginUser] = useAtom<User | null>(loginUserAtom);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{
     serial: string;
@@ -304,7 +309,7 @@ const SerialList: React.FC<SerialListProps> = ({
                       })}
                     </tbody>
                   </table>
-                  {(statusLabel === 'CAUTION' || statusLabel === 'DANGER') && (
+                  {(statusLabel === 'CAUTION' || statusLabel === 'DANGER') && loginUser?.role === 'ADMIN' && (
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"

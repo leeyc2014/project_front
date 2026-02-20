@@ -29,11 +29,72 @@ type LogisticsMapProps = {
   resetToken?: number;
   viewportPadding?: { top: number; bottom: number; left: number; right: number };
   isEpcFocused?: boolean;
+  onRouteStatusSelect?: (status: 'SAFE' | 'CAUTION' | 'DANGER') => void;
+  patternAnimationEnabled?: boolean;
 };
 
 const INITIAL_CENTER: [number, number] = [128.1, 35.3];
-const INITIAL_ZOOM = 7.8;
+const INITIAL_ZOOM = 7.5;
 const INITIAL_PITCH = 60;
+const patternUniforms = {
+  name: 'pattern',
+  vs: `uniform patternUniforms {
+  float phase;
+} pattern;
+`,
+  fs: `uniform patternUniforms {
+  float phase;
+} pattern;
+`,
+  uniformTypes: {
+    phase: 'f32',
+  },
+} as const;
+
+class PatternArcLayer<DataT = unknown> extends ArcLayer<
+  DataT,
+  { patternRepeat?: number; patternPhase?: number }
+> {
+  getShaders() {
+    const patternRepeat = Math.max(1, Number(this.props.patternRepeat ?? 20));
+    const shaders = super.getShaders();
+    return {
+      ...shaders,
+      modules: [...(shaders.modules || []), patternUniforms],
+      inject: {
+        ...(shaders.inject || {}),
+        'fs:DECKGL_FILTER_COLOR': `
+          float segmentU = fract((geometry.uv.x - pattern.phase) * ${patternRepeat.toFixed(1)});
+          float v = geometry.uv.y;
+          float edge = 0.06;
+          float rectHalfV = 1.0;
+          float rectHalfU = 0.12;
+          float x = abs((segmentU - 0.5) / rectHalfU);
+          float y = abs(v / rectHalfV);
+          float rectDist = max(x, y);
+          float dotMask = 1.0 - smoothstep(1.0, 1.0 + edge, rectDist);
+
+          vec3 baseColor = color.rgb;
+          vec3 patternColor = mix(baseColor, vec3(1.0), 0.68);
+          color.rgb = mix(baseColor, patternColor, dotMask);
+          color.a *= mix(0.0, 0.8, dotMask);
+        `,
+      },
+    };
+  }
+
+  draw(opts: any) {
+    const model = (this.state as any)?.model;
+    if (model) {
+      model.shaderInputs.setProps({
+        pattern: {
+          phase: Number(this.props.patternPhase ?? 0),
+        },
+      });
+    }
+    super.draw(opts);
+  }
+}
 
 export default function LogisticsMap({
   epcFilter,
@@ -41,6 +102,8 @@ export default function LogisticsMap({
   trackingPath,
   resetToken,
   viewportPadding,
+  onRouteStatusSelect,
+  patternAnimationEnabled = false,
 }: LogisticsMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapContainerIdRef = useRef(`logistics-map-${Math.random().toString(36).slice(2, 11)}`);
@@ -52,6 +115,7 @@ export default function LogisticsMap({
   const [trackingTime, setTrackingTime] = useState<number | null>(null);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [patternPhase, setPatternPhase] = useState(0);
   const isValidCoords = (coords: [number, number] | undefined) =>
     Array.isArray(coords) && coords.length === 2 && coords.every((v) => Number.isFinite(v));
   const KOREA_BOUNDS: [[number, number], [number, number]] = [[124.6, 33.1], [131.9, 38.7]];
@@ -118,6 +182,29 @@ export default function LogisticsMap({
   useEffect(() => {
     if (routes) setRouteData(routes);
   }, [routes]);
+
+  useEffect(() => {
+    if (!patternAnimationEnabled) {
+      setPatternPhase(0);
+      return;
+    }
+    let rafId = 0;
+    let last = performance.now();
+    const speed = 0.1;
+
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setPatternPhase((prev) => {
+        const next = prev + dt * speed;
+        return next >= 1 ? next - Math.floor(next) : next;
+      });
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [patternAnimationEnabled]);
 
   const filteredRoutes = useMemo(() => {
     if (!epcFilter || epcFilter.length === 0) return routeData;
@@ -398,8 +485,8 @@ export default function LogisticsMap({
     };
 
     const getScaledWidth = (count: number) => {
-      const minWidth = 3.7;
-      const maxWidth = 8.2;
+      const minWidth = 5.0;
+      const maxWidth = 10.0;
       const ratio = toRatio(count);
       return minWidth + (maxWidth - minWidth) * ratio;
     };
@@ -438,6 +525,24 @@ export default function LogisticsMap({
       const safeRatio = Math.min(1, Math.max(0, ratio));
       return minHeight + (maxHeight - minHeight) * safeRatio;
     };
+    const patternSpacingKm = 25;
+    const minPatternRepeat = 4;
+    const maxPatternRepeat = 72;
+    const patternBuckets = new Map<number, RouteData[]>();
+    cleanedRoutes.forEach((route) => {
+      const distance = getDistanceKm(route.source_info.coords, route.target_info.coords);
+      const rawRepeat =
+        Number.isFinite(distance) && distance > 0
+          ? Math.round(distance / patternSpacingKm)
+          : minPatternRepeat;
+      const patternRepeat = Math.max(minPatternRepeat, Math.min(maxPatternRepeat, rawRepeat));
+      const bucket = patternBuckets.get(patternRepeat);
+      if (bucket) {
+        bucket.push(route);
+      } else {
+        patternBuckets.set(patternRepeat, [route]);
+      }
+    });
 
     const nodeMap = new globalThis.Map<string, { position: [number, number]; label: string }>();
     cleanedRoutes.forEach((route) => {
@@ -453,7 +558,7 @@ export default function LogisticsMap({
     const nodes = Array.from(nodeMap.values());
     return [
       new ArcLayer<RouteData>({
-        id: 'global-route-arcs',
+        id: 'global-route-arcs-base',
         data: cleanedRoutes,
         getSourcePosition: (d) => d.source_info.coords,
         getTargetPosition: (d) => d.target_info.coords,
@@ -468,7 +573,45 @@ export default function LogisticsMap({
         opacity: 1,
         pickable: true,
         autoHighlight: true,
+        onClick: ({ object }: { object?: RouteData }) => {
+          if (!object || !onRouteStatusSelect) return;
+          const cautionCount = Math.max(0, Number(object.cautionCount ?? 0) || 0);
+          const errorCount = Math.max(0, Number(object.errorCount ?? 0) || 0);
+
+          if (errorCount > 0) {
+            onRouteStatusSelect('DANGER');
+            return;
+          }
+          if (cautionCount > 0) {
+            onRouteStatusSelect('CAUTION');
+            return;
+          }
+          onRouteStatusSelect('SAFE');
+        },
       }),
+      ...(patternAnimationEnabled
+        ? Array.from(patternBuckets.entries()).map(([patternRepeat, routesInBucket]) =>
+            new PatternArcLayer<RouteData>({
+              id: `global-route-arcs-pattern-${patternRepeat}`,
+              patternRepeat,
+              patternPhase,
+              data: routesInBucket,
+              getSourcePosition: (d) => d.source_info.coords,
+              getTargetPosition: (d) => d.target_info.coords,
+              getSourceColor: (d) => getRouteColor(d),
+              getTargetColor: (d) => getRouteColor(d),
+              getWidth: () => 7,
+              getHeight: (d) => {
+                if (d.source_info.id === d.target_info.id) return 0;
+                return getScaledHeightByDistance(d.source_info.coords, d.target_info.coords);
+              },
+              widthUnits: 'pixels',
+              opacity: 1,
+              pickable: false,
+              autoHighlight: false,
+            })
+          )
+        : []),
       new ScatterplotLayer({
         id: 'global-route-nodes',
         data: nodes,
@@ -482,7 +625,7 @@ export default function LogisticsMap({
         pickable: true,
       }),
     ];
-  }, [mapReady, filteredRoutes, trackingPath, trackingTime, routeCountScale]);
+  }, [mapReady, filteredRoutes, trackingPath, trackingTime, routeCountScale, onRouteStatusSelect, patternPhase, patternAnimationEnabled]);
 
   useEffect(() => {
     if (overlayRef.current) overlayRef.current.setProps({ layers });

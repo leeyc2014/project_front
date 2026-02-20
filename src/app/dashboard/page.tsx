@@ -177,6 +177,7 @@ export default function DashboardPage() {
   const [activeSerial, setActiveSerial] = useState<string | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isPatternAnimationEnabled, setIsPatternAnimationEnabled] = useState(false);
   const [resetToken, setResetToken] = useState(0); // 원본 resetToken 복구 [cite: 179]
   const [mapPadding, setMapPadding] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
   const [serialPhase, setSerialPhase] = useState<'shown' | 'hidden' | 'enter' | 'leave'>('shown');
@@ -190,6 +191,8 @@ export default function DashboardPage() {
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const bottomChartsRef = useRef<HTMLDivElement>(null);
+  const eventStartInputRef = useRef<HTMLInputElement>(null);
+  const eventEndInputRef = useRef<HTMLInputElement>(null);
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
 
 
@@ -534,6 +537,52 @@ export default function DashboardPage() {
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
 
+  const handleQuickDateFilterChange = useCallback(
+    (key: 'eventTimeStart' | 'eventTimeEnd', value: string) => {
+      const nextFilters = { ...filters, [key]: value };
+      if (key === 'eventTimeStart' && value && nextFilters.eventTimeEnd && value > nextFilters.eventTimeEnd) {
+        nextFilters.eventTimeEnd = value;
+      }
+      if (key === 'eventTimeEnd' && value && nextFilters.eventTimeStart && value < nextFilters.eventTimeStart) {
+        nextFilters.eventTimeStart = value;
+      }
+      setFilters(nextFilters);
+      setTimelineOpen(false);
+
+      const params = new URLSearchParams(searchParams.toString());
+      const setOrDelete = (paramKey: 'eventTimeStart' | 'eventTimeEnd', paramValue: string) => {
+        if (paramValue) {
+          params.set(paramKey, paramValue);
+        } else {
+          params.delete(paramKey);
+        }
+      };
+      setOrDelete('eventTimeStart', nextFilters.eventTimeStart || '');
+      setOrDelete('eventTimeEnd', nextFilters.eventTimeEnd || '');
+      params.set('page', '0');
+      params.delete('size');
+      params.delete('st');
+
+      setResetToken((prev) => prev + 1);
+      router.push(`/dashboard?${params.toString()}`);
+    },
+    [filters, router, searchParams]
+  );
+
+  const openDatePicker = useCallback((ref: { current: HTMLInputElement | null }) => {
+    const input = ref.current;
+    if (!input) return;
+
+    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
+    if (typeof pickerInput.showPicker === 'function') {
+      pickerInput.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
+  }, []);
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-gray-100" ref={mapWrapRef}>
       <div className="absolute inset-0">
@@ -543,32 +592,77 @@ export default function DashboardPage() {
           resetToken={resetToken}
           viewportPadding={mapPadding}
           isEpcFocused={isSingleEpcCodeMode}
+          onRouteStatusSelect={handleStatusChange}
+          patternAnimationEnabled={isPatternAnimationEnabled}
         />
       </div>
 
       {/* 왼쪽 상단 플로팅 필터 및 리셋 버튼 */}
       <div className="absolute top-6 left-20 z-20 pointer-events-none flex flex-col items-start gap-3">
-        {/* 시간 필터 박스 (이미지 디자인 적용) */}
-        <div className="bg-gray-900/90 backdrop-blur-md px-6 py-2.5 rounded-full shadow-xl border border-gray-700/70 pointer-events-auto flex items-center gap-4">
+        {/* 시간 필터 박스 + 애니메이션 스위치 */}
+        <div className="pointer-events-auto flex items-center gap-3">
+        <div className="bg-gray-900/90 backdrop-blur-md px-6 py-2.5 rounded-full shadow-xl border border-gray-700/70 flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <CalendarIcon />
+            <button
+              type="button"
+              onClick={() => openDatePicker(eventStartInputRef)}
+              className="text-blue-500 hover:text-blue-400 transition-colors"
+              aria-label="Open start date picker"
+            >
+              <CalendarIcon />
+            </button>
             <input
+              ref={eventStartInputRef}
               type="date"
-              className="bg-transparent text-xs font-bold text-gray-200 outline-none uppercase tracking-tighter w-[100px]"
+              className="bg-transparent text-xs font-bold text-gray-200 outline-none uppercase tracking-tighter w-[100px] [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:pointer-events-none"
               value={filters.eventTimeStart}
-              readOnly
+              max={filters.eventTimeEnd || undefined}
+              onChange={(e) => handleQuickDateFilterChange('eventTimeStart', e.target.value)}
             />
           </div>
           <div className="h-3 w-[1px] bg-gray-600" />
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openDatePicker(eventEndInputRef)}
+              className="text-blue-500 hover:text-blue-400 transition-colors"
+              aria-label="Open end date picker"
+            >
+              <CalendarIcon />
+            </button>
             <input
+              ref={eventEndInputRef}
               type="date"
-              className="bg-transparent text-xs font-bold text-gray-200 outline-none uppercase tracking-tighter w-[100px]"
+              className="bg-transparent text-xs font-bold text-gray-200 outline-none uppercase tracking-tighter w-[100px] [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:pointer-events-none"
               value={filters.eventTimeEnd}
-              readOnly
-            />
-            <CalendarIcon />
+              min={filters.eventTimeStart || undefined}
+              onChange={(e) => handleQuickDateFilterChange('eventTimeEnd', e.target.value)}
+            />           
           </div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPatternAnimationEnabled}
+          onClick={() => setIsPatternAnimationEnabled((prev) => !prev)}
+          className="h-10 rounded-full border border-gray-700/70 bg-gray-900/90 px-2.5 shadow-xl backdrop-blur-md flex items-center gap-2"
+        >
+          <span className="text-[10px] font-black tracking-wider text-gray-200">TRACK</span>
+          <span
+            className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
+              isPatternAnimationEnabled ? 'bg-green-500/80' : 'bg-gray-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isPatternAnimationEnabled ? 'translate-x-5' : 'translate-x-1'
+              }`}
+            />
+          </span>
+          <span className="text-[10px] font-black tracking-wider text-gray-300">
+            {isPatternAnimationEnabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
         </div>
 
         {/* RESET MAP 버튼 (필터 바로 아래 배치)  */}

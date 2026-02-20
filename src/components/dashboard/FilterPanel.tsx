@@ -139,21 +139,20 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
           <FilterDetail
-            title="EPC Search"
+            title="Date Filters"
             options={[]}
-            selected={[draft.epcCode, draft.epcLot, draft.epcSerial]
-              .filter((v) => v !== '' && v != null)
-              .map(String)}
+            selected={[draft.eventTimeStart, draft.eventTimeEnd, draft.manufactureDate, draft.expiryDate].filter(Boolean)}
             onToggle={() => {}}
           >
             <div className="space-y-4">
-              <SearchInput label="EPC Code" val={draft.epcCode} onChange={(v:string) => setVal('epcCode', v)} />
-              <SearchInput label="EPC Lot" type="number" val={draft.epcLot} onChange={(v:string) => setVal('epcLot', v === '' ? null : Number(v))} />
-              <SearchInput label="EPC Serial" type="number" val={draft.epcSerial} onChange={(v:string) => setVal('epcSerial', v === '' ? null : Number(v))} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DateInput label="Event Period Start" val={draft.eventTimeStart} onChange={(v:string) => setVal('eventTimeStart', v)} />
+                <DateInput label="Event Period End" val={draft.eventTimeEnd} onChange={(v:string) => setVal('eventTimeEnd', v)} />
+              </div>
+              <DateInput label="Manufacture Date" val={draft.manufactureDate} onChange={(v:string) => setVal('manufactureDate', v)} />
+              <DateInput label="Expiry Date" val={draft.expiryDate} onChange={(v:string) => setVal('expiryDate', v)} />
             </div>
           </FilterDetail>
-
-          {/* 체크박스 그룹 (백엔드 location_id -> 프론트 locationTypes 매핑 결과 사용) */}
           <FilterDetail 
             title="LOCATION: 공장" 
             options={filterOptions?.factoryLocationTypes || []} 
@@ -179,6 +178,18 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             onToggle={(v:string) => toggle('retailerLocationTypes', v)} 
           />
           <FilterDetail 
+            title="EPC Product" 
+            options={filterOptions?.epcProducts || []} 
+            selected={draft.epcProducts || []} 
+            onToggle={(v:string) => toggle('epcProducts', v)} 
+          />
+          <FilterDetail 
+            title="EPC Company" 
+            options={filterOptions?.epcCompanies || []} 
+            selected={draft.epcCompanies || []} 
+            onToggle={(v:string) => toggle('epcCompanies', v)} 
+          />
+          <FilterDetail 
             title="Operator ID" 
             options={filterOptions?.operatorIds || []} 
             selected={draft.operatorIds || []} 
@@ -190,32 +201,18 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             selected={draft.deviceIds || []} 
             onToggle={(v:string) => toggle('deviceIds', v)} 
           />
-          <FilterDetail 
-            title="EPC Company" 
-            options={filterOptions?.epcCompanies || []} 
-            selected={draft.epcCompanies || []} 
-            onToggle={(v:string) => toggle('epcCompanies', v)} 
-          />
-          <FilterDetail 
-            title="EPC Product" 
-            options={filterOptions?.epcProducts || []} 
-            selected={draft.epcProducts || []} 
-            onToggle={(v:string) => toggle('epcProducts', v)} 
-          />
-
           <FilterDetail
-            title="Date Filters"
+            title="EPC Search"
             options={[]}
-            selected={[draft.eventTimeStart, draft.eventTimeEnd, draft.manufactureDate, draft.expiryDate].filter(Boolean)}
+            selected={[draft.epcCode, draft.epcLot, draft.epcSerial]
+              .filter((v) => v !== '' && v != null)
+              .map(String)}
             onToggle={() => {}}
           >
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DateInput label="Event Period Start" val={draft.eventTimeStart} onChange={(v:string) => setVal('eventTimeStart', v)} />
-                <DateInput label="Event Period End" val={draft.eventTimeEnd} onChange={(v:string) => setVal('eventTimeEnd', v)} />
-              </div>
-              <DateInput label="Manufacture Date" val={draft.manufactureDate} onChange={(v:string) => setVal('manufactureDate', v)} />
-              <DateInput label="Expiry Date" val={draft.expiryDate} onChange={(v:string) => setVal('expiryDate', v)} />
+              <SearchInput label="EPC Code" val={draft.epcCode} onChange={(v:string) => setVal('epcCode', v)} />
+              <SearchInput label="EPC Lot" type="number" val={draft.epcLot} onChange={(v:string) => setVal('epcLot', v === '' ? null : Number(v))} />
+              <SearchInput label="EPC Serial" type="number" val={draft.epcSerial} onChange={(v:string) => setVal('epcSerial', v === '' ? null : Number(v))} />
             </div>
           </FilterDetail>
         </div>
