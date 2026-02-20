@@ -77,7 +77,15 @@ export default function Page() {
                 if (result.token) {
                     setTokenCookie(result.token);
                 }
-                setLoginUser(result);
+
+                // 로그인 정보 저장
+                if(result.id && result.name && result.role) {
+                    setLoginUser({
+                        id: result.id,
+                        name: result.name,
+                        role: result.role
+                    });
+                }                
 
                 // 대시보드로 이동
                 router.push(`/dashboard?${defaultDashboardQuery}`);
