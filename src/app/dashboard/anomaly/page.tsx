@@ -1,31 +1,11 @@
 // app/anomaly-reports/page.tsx
 "use client";
 
+import { EVENT_TYPE_LABELS } from "@/constants/eventType";
 import { convertMessage } from "@/utils/aiMessageUtil";
 import React, { useState, useEffect, useCallback } from "react";
 
 /* ── 코드 → 한글 상수 맵 ────────────────────────────── */
-const BUSINESS_STEP_KO: Record<string, string> = {
-  Factory:       "공장 생산",
-  Warehouse:     "창고 관리",
-  WMS:           "창고 관리(WMS)",
-  Logistics_HUB: "물류 허브",
-  Saler:         "도매상",
-  Retailer:      "소매상",
-};
-
-const EVENT_TYPE_KO: Record<string, string> = {
-  Aggregation: '공장',
-  WMS_Inbound: '공장창고(In)',
-  WMS_Outbound: '공장창고(Out)',
-  HUB_Inbound: '물류센터(In)',
-  HUB_Outbound: '물류센터(Out)',
-  W_Stock_Inbound: '도매(In)',
-  W_Stock_Outbound: '도매(Out)',
-  R_Stock_Inbound: '소매(In)',
-  R_Stock_Outbound: '소매(Out)',
-  POS_Sell: '판매완료',
-};
 
 const LOCATION_TYPE_KO: Record<string, string> = {
   Factory:        "공장",
@@ -440,7 +420,7 @@ export default function AnomalyReportsPage() {
                       </td>
                       <td className="px-5 py-4">
                         <span className="inline-block bg-blue-900/50 text-blue-300 text-xs font-bold px-2.5 py-1 rounded-lg border border-blue-700/50">
-                          {ko(EVENT_TYPE_KO, report.logisMove.eventType)}
+                          {ko(EVENT_TYPE_LABELS, report.logisMove.eventType)}
                         </span>
                       </td>
                       <td className="px-5 py-4 font-mono text-xs text-gray-300 max-w-[300px] truncate" title={report.logisMove.epcCode}>
@@ -554,7 +534,7 @@ export default function AnomalyReportsPage() {
                   /> */}
                   <InfoRow
                     label="이벤트 유형"
-                    value={ko(EVENT_TYPE_KO, selectedReport.logisMove.eventType)}
+                    value={ko(EVENT_TYPE_LABELS, selectedReport.logisMove.eventType)}
                     badge badgeColor="blue"
                   />
                   {/* Hub Type */}

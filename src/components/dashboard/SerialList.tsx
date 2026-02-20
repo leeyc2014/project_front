@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { RiskItem } from '@/types/dashboard';
-import {convertMessage} from '@/utils/aiMessageUtil';
+import { convertMessage } from '@/utils/aiMessageUtil';
 import { useAtom } from 'jotai';
 import { User } from '@/types/user';
 import { loginUserAtom } from '@/atoms/atom';
+import { EVENT_TYPE_LABELS } from '@/constants/eventType';
 
 type SerialListProps = {
   page: number;
@@ -67,8 +68,9 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
     selectedMessageObj.severity === 'DANGER'
       ? 'border-red-700 bg-red-900/40 text-red-100'
       : selectedMessageObj.severity === 'CAUTION'
-      ? 'border-yellow-700 bg-yellow-900/35 text-yellow-100'
-      : 'border-gray-700 bg-gray-800 text-white';
+        ? 'border-yellow-700 bg-yellow-900/35 text-yellow-100'
+        : 'border-gray-700 bg-gray-800 text-white';
+  const initialDetailMessage = messageOptions[0].text + '\n';
 
   if (!isOpen) return null;
 
@@ -89,14 +91,14 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
 
         <div className="space-y-4 p-6">
           <div>
-            <label className="mb-1 block text-xs font-bold text-white">1. 제품 일련번호</label>
-            <div className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-white">
+            <label className="mb-1 block text-xs font-bold text-white">1. EPC Code</label>
+            <div className="rounded-lg bg-gray-800 px-3 py-2 text-xs text-white">
               {serialNumber}
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-bold text-white">2. 이상 발생 위치 (고정)</label>
+            <label className="mb-1 block text-xs font-bold text-white">2. 이상 발생 위치</label>
             {locationOptions.length > 1 ? (
               <select
                 className={`w-full rounded-lg px-3 py-2 text-sm ${locationBgClass}`}
@@ -110,7 +112,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
                 ))}
               </select>
             ) : (
-              <div className={`rounded-lg border px-3 py-2 text-sm ${locationBgClass}`}>
+              <div className={`rounded-lg px-3 py-2 text-sm ${locationBgClass}`}>
                 {selectedLocationItem.location}
               </div>
             )}
@@ -125,14 +127,14 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
                 onChange={(e) => setSelectedMessage(e.target.value)}
               >
                 {messageOptions.map((message, index) => (
-                  <option key={`${message.text}-${index}`} value={message.text} className="bg-gray-900 text-white">
-                    {message.text}
+                  <option key={`${index}`} value={convertMessage(message.text)} className="bg-gray-900 text-white">
+                    {convertMessage(message.text)}
                   </option>
                 ))}
               </select>
             ) : (
-              <div className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white">
-                {messageOptions[0].text}
+              <div className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white">
+                {convertMessage(messageOptions[0].text)}
               </div>
             )}
           </div>
@@ -142,15 +144,9 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
             <textarea
               placeholder="공장 정보, 발생 시점 및 구체적인 상황을 입력하세요."
               className="min-h-24 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder:text-gray-400"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-bold text-white">5. 조치 및 결과 (입력)</label>
-            <textarea
-              placeholder="작업자가 취한 조치 내용을 입력하세요."
-              className="min-h-24 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder:text-gray-400"
-            />
+            >
+              {initialDetailMessage}
+            </textarea>
           </div>
         </div>
 
@@ -158,8 +154,8 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
           <button onClick={onClose} className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-bold text-white hover:bg-gray-800">
             취소
           </button>
-          <button onClick={handleSubmit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500">
-            보고서 제출
+          <button onClick={handleSubmit} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
+            조치 요청 제출
           </button>
         </div>
       </div>
@@ -208,9 +204,23 @@ const SerialList: React.FC<SerialListProps> = ({
 
   const toDateText = (value: unknown) => {
     if (value == null) return '-';
-    const ms = value instanceof Date ? value.getTime() : new Date(value as string | number).getTime();
+
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    const ms = date.getTime();
+
+    // 유효하지 않은 날짜 체크
     if (!Number.isFinite(ms)) return '-';
-    return new Date(ms).toLocaleString();
+
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    const yyyy = date.getFullYear();
+    const MM = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const HH = pad(date.getHours());
+    const mm = pad(date.getMinutes());
+    const ss = pad(date.getSeconds());
+
+    return `${yyyy}-${MM}-${dd} ${HH}:${mm}:${ss}`;
   };
 
   return (
@@ -225,11 +235,10 @@ const SerialList: React.FC<SerialListProps> = ({
               key={key}
               type="button"
               onClick={() => onStatusChange(key)}
-              className={`px-2 py-0.5 text-[10px] font-bold rounded-full transition-colors ${
-                statusFilter === key
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-full transition-colors ${statusFilter === key
                   ? 'bg-white text-gray-600'
                   : 'text-white hover:text-gray-400'
-              }`}
+                }`}
             >
               {key}
             </button>
@@ -239,116 +248,115 @@ const SerialList: React.FC<SerialListProps> = ({
       {isListVisible ? (
         <div className="flex-1 overflow-y-auto space-y-2">
           {pagedSerials.map((serial) => {
-          const isOpen = activeSerial === serial;
-          const items = (eventsBySerial[serial] || []).filter((event) => event != null);
-          const first = items[0];
-          const productName = first?.productName || first?.epcProduct || '-';
-          const lot = first?.epcLot ?? '-';
-          const epcSerial = first?.epcSerial ?? '-';
-          const label = `${productName}(LOT: ${lot}, SERIAL: ${epcSerial})`;
-          const statusLabel =
-            first?.st === 'DANGER'
-              ? 'DANGER'
-              : first?.st === 'CAUTION'
-              ? 'CAUTION'
-              : 'SAFE';
-          const statusClass =
-            statusLabel === 'DANGER'
-              ? 'text-red-300'
-              : statusLabel === 'CAUTION'
-              ? 'text-yellow-300'
-              : 'text-green-300';
-          return (
-            <div key={serial} className="border border-gray-800 rounded-lg overflow-hidden bg-gray-900/80">
-              <button
-                type="button"
-                onClick={() => onSerialToggle(serial)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-left ${
-                  isOpen ? 'bg-gray-800/70' : 'bg-transparent hover:bg-gray-800/60'
-                }`}
-              >
-                <span className="text-[12px] font-bold text-white">{label}</span>
-                <span className={`text-[10px] font-black tracking-widest ${statusClass}`}>
-                  {statusLabel}
-                </span>
-              </button>
+            const isOpen = activeSerial === serial;
+            const items = (eventsBySerial[serial] || []).filter((event) => event != null);
+            const first = items[0];
+            const productName = first?.productName || first?.epcProduct || '-';
+            const lot = first?.epcLot ?? '-';
+            const epcSerial = first?.epcSerial ?? '-';
+            const label = `${productName}(LOT: ${lot}, SERIAL: ${epcSerial})`;
+            const statusLabel =
+              first?.st === 'DANGER'
+                ? 'DANGER'
+                : first?.st === 'CAUTION'
+                  ? 'CAUTION'
+                  : 'SAFE';
+            const statusClass =
+              statusLabel === 'DANGER'
+                ? 'text-red-300'
+                : statusLabel === 'CAUTION'
+                  ? 'text-yellow-300'
+                  : 'text-green-300';
+            return (
+              <div key={serial} className="border border-gray-800 rounded-lg overflow-hidden bg-gray-900/80">
+                <button
+                  type="button"
+                  onClick={() => onSerialToggle(serial)}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-left ${isOpen ? 'bg-gray-800/70' : 'bg-transparent hover:bg-gray-800/60'
+                    }`}
+                >
+                  <span className="text-[12px] font-bold text-white">{label}</span>
+                  <span className={`text-[10px] font-black tracking-widest ${statusClass}`}>
+                    {statusLabel}
+                  </span>
+                </button>
 
-              {isOpen && (
-                <div className="p-2">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-800 text-[10px] font-semibold text-white">
-                      <tr>
-                        <th className="p-2">Scan</th>
-                        <th className="p-2">Type</th>
-                        <th className="p-2">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800 text-xs text-white">
-                      {items.map((event, index) => {
-                        const hasRule = Boolean((event.ruleCheck || '').trim());
-                        const hasAi = Boolean((event.aiCheck || '').trim());
-                        const rowClass = hasRule
-                          ? 'bg-red-900/90 hover:bg-red-900/100'
-                          : hasAi
-                          ? 'bg-yellow-900/90 hover:bg-yellow-900/100'
-                          : 'hover:bg-gray-800/60';
+                {isOpen && (
+                  <div className="p-2">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-800 text-[10px] font-semibold text-white">
+                        <tr>
+                          <th className="p-2">Scan</th>
+                          <th className="p-2">Type</th>
+                          <th className="p-2">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800 text-xs text-white">
+                        {items.map((event, index) => {
+                          const hasRule = Boolean((event.ruleCheck || '').trim());
+                          const hasAi = Boolean((event.aiCheck || '').trim());
+                          const rowClass = hasRule
+                            ? 'bg-red-900/90 hover:bg-red-900/100'
+                            : hasAi
+                              ? 'bg-yellow-900/90 hover:bg-yellow-900/100'
+                              : 'hover:bg-gray-800/60';
 
-                        return (
-                          <tr
-                            key={event.id ?? `${serial}-${event.eventTime ?? 'time'}-${index}`}
-                            className={rowClass}
-                            title={hasRule ? convertMessage(event.ruleCheck!) : hasAi ? convertMessage(event.aiCheck!) : ''}
-                          >
-                            <td className="p-2"><sup className="font-bold">{hasRule ? '위험' : hasAi ? '주의' : ''}</sup> {event.scanLocation ?? '-'}</td>
-                            <td className="p-2">{event.eventType ?? '-'}</td>
-                            <td className="p-2 font-mono text-[10px] text-white">
-                              {toDateText(event.eventTime)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {(statusLabel === 'CAUTION' || statusLabel === 'DANGER') && loginUser?.role === 'ADMIN' && (
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const locationMap = new Map<string, Map<string, 'DANGER' | 'CAUTION'>>();
-                          items.forEach((event) => {
-                            const location = (event.scanLocation || '-').trim() || '-';
-                            const rule = (event.ruleCheck || '').trim();
-                            const ai = (event.aiCheck || '').trim();
-                            if (!rule && !ai) return;
-                            if (!locationMap.has(location)) locationMap.set(location, new Map<string, 'DANGER' | 'CAUTION'>());
-                            if (rule) locationMap.get(location)!.set(rule, 'DANGER');
-                            if (ai && !locationMap.get(location)!.has(ai)) locationMap.get(location)!.set(ai, 'CAUTION');
-                          });
-                          const anomalyByLocation: ReportAnomalyByLocation = Array.from(locationMap.entries()).map(([location, messageMap]) => ({
-                            location,
-                            messages: Array.from(messageMap.entries()).map(([text, severity]) => ({ text, severity })),
-                          }));
-                          if (anomalyByLocation.length === 0) {
-                            const fallbackLocation = (first?.scanLocation || '-').trim() || '-';
-                            anomalyByLocation.push({ location: fallbackLocation, messages: [{ text: '-', severity: 'NONE' }] });
-                          }
-                          setReportTarget({
-                            serial,
-                            anomalyByLocation,
-                          });
-                          setIsReportOpen(true);
-                        }}
-                        className="rounded-lg border border-blue-500 bg-blue-600/20 px-3 py-1.5 text-[11px] font-bold text-blue-200 hover:bg-blue-600/35"
-                      >
-                        조치 보고서
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                          return (
+                            <tr
+                              key={event.id ?? `${serial}-${event.eventTime ?? 'time'}-${index}`}
+                              className={rowClass}
+                              title={hasRule ? convertMessage(event.ruleCheck!) : hasAi ? convertMessage(event.aiCheck!) : ''}
+                            >
+                              <td className="p-2"><sup className="font-bold">{hasRule ? '위험' : hasAi ? '주의' : ''}</sup> {event.scanLocation ?? '-'}</td>
+                              <td className="p-2">{event.eventType ? EVENT_TYPE_LABELS[event.eventType] : '-'}</td>
+                              <td className="p-2 font-mono text-[10px] text-white">
+                                {toDateText(event.eventTime)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {(statusLabel === 'CAUTION' || statusLabel === 'DANGER') && loginUser?.role === 'ADMIN' && (
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const locationMap = new Map<string, Map<string, 'DANGER' | 'CAUTION'>>();
+                            items.forEach((event) => {
+                              const location = (event.scanLocation || '-').trim() || '-';
+                              const rule = (event.ruleCheck || '').trim();
+                              const ai = (event.aiCheck || '').trim();
+                              if (!rule && !ai) return;
+                              if (!locationMap.has(location)) locationMap.set(location, new Map<string, 'DANGER' | 'CAUTION'>());
+                              if (rule) locationMap.get(location)!.set(rule, 'DANGER');
+                              if (ai && !locationMap.get(location)!.has(ai)) locationMap.get(location)!.set(ai, 'CAUTION');
+                            });
+                            const anomalyByLocation: ReportAnomalyByLocation = Array.from(locationMap.entries()).map(([location, messageMap]) => ({
+                              location,
+                              messages: Array.from(messageMap.entries()).map(([text, severity]) => ({ text, severity })),
+                            }));
+                            if (anomalyByLocation.length === 0) {
+                              const fallbackLocation = (first?.scanLocation || '-').trim() || '-';
+                              anomalyByLocation.push({ location: fallbackLocation, messages: [{ text: '-', severity: 'NONE' }] });
+                            }
+                            setReportTarget({
+                              serial,
+                              anomalyByLocation,
+                            });
+                            setIsReportOpen(true);
+                          }}
+                          className="rounded-lg border border-red-500 bg-red-600/20 px-3 py-1.5 text-[11px] font-bold text-red-200 hover:bg-red-600/35"
+                        >
+                          조치 요청 등록
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {serials.length === 0 && (
             <div className="p-6 text-center text-xs text-white">No serials found.</div>

@@ -455,7 +455,7 @@ export function EpcTimelineModal({
             const eventType = point.meta.eventType || 'Unknown';
             return `
               <div style="padding:8px 10px;font-size:11px;">
-                <div style="font-weight:700;margin-bottom:4px;">${eventType}</div>
+                <div style="font-weight:700;margin-bottom:4px;">${EVENT_TYPE_LABELS[eventType.toUpperCase()]}</div>
                 <div>${timeText}</div>
               </div>
             `;
@@ -468,7 +468,7 @@ export function EpcTimelineModal({
   if (!open) return null;
 
   return (
-    <div className="fixed right-[450px] top-24 z-40 w-[240px] max-w-[85vw]">
+    <div className="fixed right-[450px] top-24 z-40 w-[240px] max-w-[85vw] scale-150 origin-top-right">
       <div className="rounded-2xl border border-gray-700 bg-gray-900/95 p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <div>
