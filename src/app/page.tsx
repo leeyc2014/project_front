@@ -75,7 +75,7 @@ export default function Page() {
 
             if (response.ok && result.success) {
                 // 로그인 성공 시 로직
-                alert(`로그인 성공! ${result.message}`);
+                //alert(`로그인 성공! ${result.message}`);
                 
                 // JWT 토큰이 있다면 저장
                 if (result.token) {

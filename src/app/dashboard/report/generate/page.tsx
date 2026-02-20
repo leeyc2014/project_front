@@ -1,170 +1,324 @@
+// app/period-ranges/page.tsx
 "use client";
-import React, { useEffect, useState } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
-interface ReportHistory {
-  id: string;
-  date: string;
-  dangerCount: number;
-  cautionCount: number;
-  fileName: string;
+import React, { useState, useEffect, useMemo } from "react";
+
+/* ─── 유틸 ─────────────────────────────────────────── */
+
+function parseLocal(str: string): Date {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
-export default function ReportGeneratePage() {
-  const [history, setHistory] = useState<ReportHistory[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+function toInputStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function fmt(date: Date): string {
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}.${m}.${d} (${days[date.getDay()]})`;
+}
+
+interface PeriodRange {
+  from: Date;
+  to: Date;
+}
+
+interface Product {
+  id: string | number;
+  label: string;
+}
+
+type RangeType = "WEEKLY" | "MONTHLY";
+
+function buildRanges(fromStr: string, toStr: string, today: Date, type: RangeType): PeriodRange[] {
+  const from = parseLocal(fromStr);
+  const to = parseLocal(toStr);
+  const ranges: PeriodRange[] = [];
+
+  if (type === "WEEKLY") {
+    const fromDow = from.getDay();
+    const backToMon = fromDow === 0 ? 6 : fromDow - 1;
+    const expandedFrom = new Date(from);
+    expandedFrom.setDate(from.getDate() - backToMon);
+
+    const toDow = to.getDay();
+    const fwdToSun = toDow === 0 ? 0 : 7 - toDow;
+    const expandedTo = new Date(to);
+    expandedTo.setDate(to.getDate() + fwdToSun);
+    if (expandedTo > today) expandedTo.setTime(today.getTime());
+
+    const cur = new Date(expandedFrom);
+    while (cur <= expandedTo) {
+      const start = new Date(cur);
+      const end = new Date(cur);
+      end.setDate(cur.getDate() + 6);
+
+      ranges.push({ from: start, to: end > expandedTo ? new Date(expandedTo) : end });
+      cur.setDate(cur.getDate() + 7);
+    }
+  } else {
+    const expandedFrom = new Date(from.getFullYear(), from.getMonth(), 1);
+
+    const expandedTo = new Date(to.getFullYear(), to.getMonth() + 1, 0);
+    if (expandedTo > today) expandedTo.setTime(today.getTime());
+
+    const cur = new Date(expandedFrom);
+    while (cur <= expandedTo) {
+      const start = new Date(cur.getFullYear(), cur.getMonth(), 1);
+      const end = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
+
+      ranges.push({ from: start, to: end > expandedTo ? new Date(expandedTo) : end });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+
+  return ranges.reverse(); 
+}
+
+/* ─── 페이지 ────────────────────────────────────────── */
+export default function PeriodRangePage() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem('reportHistory');
-    if (savedHistory) setHistory(JSON.parse(savedHistory));
+    setIsMounted(true);
+
+    // 제품 목록 Fetch
+    const fetchProducts = async () => {
+      try {
+        const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+        const url = `${backendBaseUrl}/api/v1/dashboard/init-data`;
+        const token = getToken();
+        const authHeaders = { Authorization: `Bearer ${token}` };
+
+        const res = await fetch(url, { headers: authHeaders });
+        const data = await res.json();
+
+        if (data?.filters?.productList) {
+          // 최상단에 "전체" 항목 추가
+          setProducts([
+            { id: "", label: "전체" },
+            ...data.filters.productList
+          ]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+        // API 에러 시 폴백(Fallback) 처리
+        setProducts([{ id: "", label: "전체" }]);
+      }
+    };
+
+    fetchProducts();
   }, []);
 
-  // PDF 생성 및 다운로드 함수
-  const generatePDF = (data: any[]) => {
-    const doc = new jsPDF();
-    const riskItems = data.filter((item: any) => item.st === 'DANGER' || item.st === 'CAUTION');
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
-    // 1. 헤더 설정
-    doc.setFontSize(20);
-    doc.setTextColor(40);
-    doc.text('Supply Chain Risk Analysis Report', 14, 22);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
-    doc.text(`Total Risk Items Detected: ${riskItems.length}`, 14, 35);
+  const [rangeType, setRangeType] = useState<RangeType>("WEEKLY");
+  const [fromStr, setFromStr] = useState("2024-01-01");
+  const [toStr, setToStr] = useState(toInputStr(today));
 
-    // 2. 테이블 데이터 구성
-    const tableColumn = ["Status", "EPC Code", "Location", "Event Time", "AI Analysis"];
-    const tableRows = riskItems.map(item => [
-      item.st,
-      item.epcCode,
-      item.scanLocation,
-      item.eventTime,
-      item.st === 'DANGER' ? 'Critical Anomaly Detected' : 'Minor Discrepancy Found'
-    ]);
+  const periodRanges = useMemo(() => {
+    if (!isMounted) return [];
+    return buildRanges(fromStr, toStr, today, rangeType);
+  }, [fromStr, toStr, today, rangeType, isMounted]);
 
-    // 3. 테이블 삽입
-    autoTable(doc, {
-      startY: 45,
-      head: [tableColumn],
-      body: tableRows,
-      headStyles: { fillColor: [31, 41, 55] }, // Gray-800
-      didParseCell: (data) => {
-        if (data.section === 'body' && data.column.index === 0) {
-          const val = data.cell.raw;
-          if (val === 'DANGER') data.cell.styles.textColor = [220, 38, 38]; // Red
-          if (val === 'CAUTION') data.cell.styles.textColor = [217, 119, 6]; // Amber
-        }
-      }
-    });
-
-    // 4. 저장
-    const fileName = `Risk_Report_${Date.now()}.pdf`;
-    doc.save(fileName);
-    return fileName;
+  const getToken = () => {
+    if (typeof window === 'undefined') return '';
+    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
+    if (match) return decodeURIComponent(match[1]);
+    return sessionStorage.getItem('token') || '';
   };
 
-  const generateNewReport = async () => {
-    setIsGenerating(true);
+  const dayCount = (r: PeriodRange) =>
+    Math.round((r.to.getTime() - r.from.getTime()) / 86_400_000) + 1;
 
-    try {
-      // 1. API로부터 최신 데이터 가져오기 (또는 localStorage)
-      const response = await fetch('/api/epcis/events');
-      const currentData = await response.json();
-
-      if (!currentData || currentData.length === 0) {
-        alert("분석할 데이터가 없습니다.");
-        setIsGenerating(false);
-        return;
-      }
-
-      const dangerCount = currentData.filter((d: any) => d.st === 'DANGER').length;
-      const cautionCount = currentData.filter((d: any) => d.st === 'CAUTION').length;
-
-      // 2. PDF 생성 및 다운로드 실행
-      const savedFileName = generatePDF(currentData);
-
-      // 3. 히스토리 저장
-      const newReport = {
-        id: `RPT-${Date.now().toString().slice(-6)}`,
-        date: new Date().toLocaleDateString(),
-        dangerCount,
-        cautionCount,
-        fileName: savedFileName
-      };
-
-      const updatedHistory = [newReport, ...history];
-      setHistory(updatedHistory);
-      localStorage.setItem('reportHistory', JSON.stringify(updatedHistory));
-      
-    } catch (error) {
-      console.error("PDF 생성 오류:", error);
-      alert("리포트 생성 중 오류가 발생했습니다.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-white px-6 py-10">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <h1 className="text-3xl font-black tracking-tight">진단 리포트</h1>
+          <p className="text-gray-400 text-sm mt-1">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8 space-y-8 h-full overflow-y-auto bg-gray-50">
-      <div className="flex justify-between items-end border-b pb-6 bg-white p-6 rounded-3xl shadow-sm">
-        <div>
-          <h1 className="text-3xl font-black italic uppercase text-gray-900 tracking-tighter">Risk Intelligence</h1>
-          <p className="text-gray-500 font-medium">AI 무결성 검증을 통과하지 못한 항목들에 대한 정밀 진단 리포트입니다.</p>
-        </div>
-        <button 
-          onClick={generateNewReport}
-          disabled={isGenerating}
-          className={`px-8 py-4 rounded-2xl font-black shadow-lg transition-all ${
-            isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-          }`}
-        >
-          {isGenerating ? 'ANALYZING DATA...' : 'GENERATE AI REPORT'}
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-950 text-white px-6 py-10">
+      <div className="max-w-4xl mx-auto space-y-6"> {/* 너비를 3xl -> 4xl로 확장하여 3단 배치 고려 */}
 
-      <div className="space-y-4">
-        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-2">Archived Analysis</h3>
-        {history.length === 0 ? (
-          <div className="p-20 text-center border-2 border-dashed rounded-[40px] text-gray-300 font-bold uppercase">
-            No report history found
-          </div>
-        ) : (
-          history.map((item) => (
-            <div key={item.id} className="bg-white border-gray-100 border rounded-[32px] p-6 flex items-center justify-between hover:shadow-xl transition-all group">
-              <div className="flex items-center space-x-8">
-                <div className="bg-blue-50 p-4 rounded-2xl group-hover:bg-blue-600 transition-colors">
-                  <svg className="w-8 h-8 text-blue-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{item.id}</p>
-                  <h4 className="text-lg font-black text-gray-800">{item.fileName}</h4>
-                  <p className="text-xs text-gray-400 font-medium">{item.date} • Secured by AI Integrity Check</p>
-                </div>
-                <div className="flex space-x-6 border-l pl-8">
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Danger</p>
-                    <p className="text-xl font-black text-red-500">{item.dangerCount}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Caution</p>
-                    <p className="text-xl font-black text-amber-500">{item.cautionCount}</p>
-                  </div>
-                </div>
+        {/* 헤더 */}
+        <div>
+          <h1 className="text-3xl font-black tracking-tight">진단 리포트</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            기간별 진단 리포트를 확인하세요.
+          </p>
+        </div>
+
+        {/* 컨트롤 박스 (좌/중/우 배치 컨테이너) */}
+        <div className="bg-gray-900 rounded-2xl border border-gray-800 p-6 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-6">
+          
+          {/* (왼쪽) 날짜 범위 선택 */}
+          <div className="flex flex-col gap-3 flex-shrink-0">
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+              Date Range
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={fromStr}
+                  max={toStr}
+                  onChange={(e) => setFromStr(e.target.value)}
+                  className="bg-gray-800 text-white px-3 py-2.5 rounded-xl border border-gray-700 focus:outline-none focus:border-blue-500 text-sm font-mono [color-scheme:dark] h-[46px]"
+                />
               </div>
-              <button 
-                onClick={() => alert('히스토리 목록의 파일을 다시 다운로드하려면 서버 저장 로직이 필요합니다. 현재는 즉시 생성만 가능합니다.')}
-                className="px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black hover:bg-blue-600 transition-all shadow-md"
-              >
-                DOWNLOAD AGAIN
-              </button>
+
+              <span className="text-gray-600 pb-2.5 text-lg">→</span>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                  To
+                </label>
+                <input
+                  type="date"
+                  value={toStr}
+                  min={fromStr}
+                  max={toInputStr(today)}
+                  onChange={(e) => setToStr(e.target.value)}
+                  className="bg-gray-800 text-white px-3 py-2.5 rounded-xl border border-gray-700 focus:outline-none focus:border-blue-500 text-sm font-mono [color-scheme:dark] h-[46px]"
+                />
+              </div>
             </div>
-          ))
-        )}
+          </div>
+
+          {/* (중앙) 제품 선택 */}
+          <div className="flex flex-col gap-3 flex-1 w-full lg:w-auto min-w-[180px]">
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+              Select Product
+            </p>
+            <select
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              className="bg-gray-800 text-white px-4 py-2.5 rounded-xl border border-gray-700 focus:outline-none focus:border-blue-500 text-sm [color-scheme:dark] h-[46px] w-full cursor-pointer"
+            >
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* (오른쪽) 범위 타입 선택 */}
+          <div className="flex flex-col gap-3 flex-shrink-0">
+             <p className="text-xs font-black uppercase tracking-widest text-gray-400">
+               Analysis Unit
+             </p>
+             <div className="flex bg-gray-950 p-1 rounded-xl w-max border border-gray-800 h-[46px] items-center">
+               <button
+                 onClick={() => setRangeType("WEEKLY")}
+                 className={`px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all h-full ${
+                   rangeType === "WEEKLY"
+                     ? "bg-blue-600 text-white shadow-md"
+                     : "text-gray-500 hover:text-white hover:bg-gray-800"
+                 }`}
+               >
+                 Weekly
+               </button>
+               <button
+                 onClick={() => setRangeType("MONTHLY")}
+                 className={`px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all h-full ${
+                   rangeType === "MONTHLY"
+                     ? "bg-blue-600 text-white shadow-md"
+                     : "text-gray-500 hover:text-white hover:bg-gray-800"
+                 }`}
+               >
+                 Monthly
+               </button>
+             </div>
+          </div>
+
+        </div>
+
+        {/* 리포트 리스트 테이블 */}
+        <div className="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-widest text-gray-300">
+              {rangeType === "WEEKLY" ? "주차별" : "월별"} 리포트 목록
+            </span>
+            <span className="text-xs text-gray-500">{periodRanges.length}개 리포트</span>
+          </div>
+
+          <div className="divide-y divide-gray-800">
+            {periodRanges.length === 0 ? (
+              <div className="px-6 py-10 text-center text-gray-500 text-sm">
+                유효한 날짜 범위를 선택하세요.
+              </div>
+            ) : (
+              periodRanges.map((range, idx) => {
+                const isLatest = idx === 0;
+                const days = dayCount(range);
+                return (
+                  <div
+                    key={idx}
+                    className="px-6 py-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {isLatest && (
+                        <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-md tracking-wider">
+                          LATEST
+                        </span>
+                      )}
+                      <span className="text-sm font-mono text-white">
+                        {fmt(range.from)}
+                      </span>
+                      <span className="text-gray-600">~</span>
+                      <span className="text-sm font-mono text-white">
+                        {fmt(range.to)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({days}일)
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        // 새 창으로 인쇄 페이지 열기 (Query String 포함)
+                        const queryParams = new URLSearchParams({
+                          from: toInputStr(range.from),
+                          to: toInputStr(range.to),
+                          productId: selectedProductId
+                        }).toString();
+                        
+                        window.open(`/print?${queryParams}`, "_blank");
+                      }}
+                      className="px-5 py-2.5 bg-gray-800 text-white rounded-xl text-xs font-black hover:bg-blue-600 transition-all shadow-md border border-gray-700 group-hover:border-blue-500 whitespace-nowrap"
+                    >
+                      미리보기
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   );

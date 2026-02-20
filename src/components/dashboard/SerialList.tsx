@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { RiskItem } from '@/types/dashboard';
+import {convertMessage} from '@/utils/aiMessageUtil';
 
 type SerialListProps = {
   page: number;
@@ -282,17 +283,18 @@ const SerialList: React.FC<SerialListProps> = ({
                         const hasRule = Boolean((event.ruleCheck || '').trim());
                         const hasAi = Boolean((event.aiCheck || '').trim());
                         const rowClass = hasRule
-                          ? 'bg-red-900/40 hover:bg-red-900/55'
+                          ? 'bg-red-900/90 hover:bg-red-900/100'
                           : hasAi
-                          ? 'bg-yellow-900/35 hover:bg-yellow-900/50'
+                          ? 'bg-yellow-900/90 hover:bg-yellow-900/100'
                           : 'hover:bg-gray-800/60';
 
                         return (
                           <tr
                             key={event.id ?? `${serial}-${event.eventTime ?? 'time'}-${index}`}
                             className={rowClass}
+                            title={hasRule ? convertMessage(event.ruleCheck!) : hasAi ? convertMessage(event.aiCheck!) : ''}
                           >
-                            <td className="p-2">{event.scanLocation ?? '-'}</td>
+                            <td className="p-2"><sup className="font-bold">{hasRule ? '위험' : hasAi ? '주의' : ''}</sup> {event.scanLocation ?? '-'}</td>
                             <td className="p-2">{event.eventType ?? '-'}</td>
                             <td className="p-2 font-mono text-[10px] text-white">
                               {toDateText(event.eventTime)}

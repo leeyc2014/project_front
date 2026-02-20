@@ -438,6 +438,8 @@ export default function DashboardPage() {
   }, [router, searchParams]);
 
   const handleStatusChange = useCallback((nextStatus: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER') => {
+    setTimelineOpen(false);
+
     const current = new URLSearchParams(searchParams.toString());
     const params = new URLSearchParams();
 
@@ -453,6 +455,7 @@ export default function DashboardPage() {
   }, [router, searchParams]);
 
   const handleApplyFilters = useCallback((nextFilters: FilterState) => {
+    setTimelineOpen(false);
     setFilters(nextFilters);
 
     const toCsv = (list: string[] | undefined) => {
@@ -511,10 +514,10 @@ export default function DashboardPage() {
     params.set('epcCode', value);
     params.set('page', '0');
     params.delete('size');
-    params.delete('status');
+    //params.delete('status');
     params.delete('st');
 
-    setTimelineOpen(false);
+    //setTimelineOpen(false);
     setResetToken((prev) => prev + 1);
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
@@ -617,7 +620,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts show/hide button (bottom center) */}
-      <div className="absolute bottom-3 left-3/4 z-20 pointer-events-auto">
+      <div className="absolute bottom-3 left-4 z-20 pointer-events-auto">
         <button
           onClick={toggleCharts}
           className="h-9 w-9 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-lg text-gray-700 hover:bg-gray-900 hover:text-white transition-all active:scale-95 flex items-center justify-center ring-1 ring-white/50"

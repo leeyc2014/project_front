@@ -13,13 +13,13 @@ const Icon = ({ path, className }: { path: string; className: string }) => (
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
-  const [selectedSubMenu, setSelectedSubMenu] = useState('');
   const [displayName, setDisplayName] = useState('—');
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardHome = pathname === '/dashboard';
   const dashboardHref = '/dashboard?eventTimeStart=2024-07-25&eventTimeEnd=2024-07-31';
+  const reportHref = '/dashboard/report/generate';
 
   const clearTokenCookie = () => {
     document.cookie = 'token=; Path=/; Max-Age=0; SameSite=Lax';
@@ -59,21 +59,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
 
-  const subMenus: { [key: string]: { name: string; href: string }[] } = {
-    report: [
-      { name: '리포트 생성', href: '/dashboard/report/generate' },
-      { name: '로그 업로드', href: '/dashboard/report/upload' },
-    ],
-  };
-
   useEffect(() => {
-    // '/dashboard/report/upload' 같은 긴 경로를 먼저 체크해야 합니다.
-    if (pathname.includes("/dashboard/report/upload")) {
-      setSelectedMenu("report"); // 한글 "로그 관리"가 아닌 키값 "report" 사용
-      setSelectedSubMenu("로그 업로드");
-    } else if (pathname.includes("/dashboard/report/generate")) {
+    if (pathname.includes("/dashboard/report/generate")) {
       setSelectedMenu("report");
-      setSelectedSubMenu("리포트 생성");
     } else if (pathname === ("/dashboard")) {
       setSelectedMenu("dashboard");
     }
@@ -84,16 +72,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const name = token ? decodeJwtName(token) : '';
     setDisplayName(name || '—');
   }, [pathname]);
-
-  const handleSubMenuClick = (menuKey: string, sub: { name: string; href: string }) => {
-    setSelectedMenu(menuKey);
-    setSelectedSubMenu(sub.name);
-    setHoveredMenu(null); // 클릭 시 메뉴 닫기
-
-    if (sub.href !== '#') {
-      router.push(sub.href); // 3. 실제 페이지 이동 실행
-    }
-  };
 
   const handleSignOut = () => {
     clearTokenCookie();
@@ -111,7 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <div className="h-16 flex items-center justify-between px-8 border-b border-gray-800 relative z-20 bg-gray-900">
           <div className="flex items-center space-x-12 shrink-0">
-            <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">TEST</h1>
+            <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">LOGIFLOW</h1>
             <nav className="flex space-x-8 h-16">
               <div className="h-16 flex items-center">
                 <Link
@@ -130,24 +108,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               </div>
               <div className="h-16 flex items-center">
-                <button
-                  onMouseEnter={() => {
-                    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-                    setHoveredMenu('report');
+                <Link
+                  href={reportHref}
+                  onClick={() => {
+                    setSelectedMenu("report");
+                    setHoveredMenu(null);
                   }}
-                  onMouseLeave={() => {
-                    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
-                    closeTimerRef.current = setTimeout(() => {
-                      setHoveredMenu(null);
-                    }, 120);
-                  }}
-                  onClick={() => setSelectedMenu('report')}
-                  className={`flex items-center font-bold px-1 transition-all ${selectedMenu === 'report' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-400 hover:text-white'
-                    }`}
-                >
+                  className={`flex items-center font-bold px-1 transition-all ${
+                    selectedMenu === 'report'
+                      ? 'border-blue-500 text-blue-500'
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >                  
                   진단 리포트
-                  <Icon path="M19.5 8.25l-7.5 7.5-7.5-7.5" className={`ml-2 w-3 h-3 transition-transform ${hoveredMenu === 'report' ? 'rotate-180' : ''}`} />
-                </button>
+                </Link>
               </div>
             </nav>
           </div>
@@ -189,29 +163,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span className="invisible font-bold px-1 pointer-events-none relative z-0">
                       {menuKey === 'dashboard' ? '대시보드' : '진단 리포트'}
                     </span>
-                    {hoveredMenu === menuKey && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 flex space-x-6 whitespace-nowrap pointer-events-auto z-20">
-                        {subMenus[menuKey]?.map((sub) => (
-                          <Link
-                            key={sub.name}
-                            href={sub.href}
-                            onClick={() => {
-                              setSelectedMenu(menuKey);
-                              setSelectedSubMenu(sub.name);
-                              setHoveredMenu(null);
-                            }}
-                            className={`inline-flex items-center px-2 py-1 rounded transition-all duration-200 relative z-20 pointer-events-auto ${selectedSubMenu === sub.name && selectedMenu === menuKey
-                              ? 'text-blue-400 font-black' : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
-                              }`}
-                          >
-                            {sub.name}
-                            {selectedSubMenu === sub.name && selectedMenu === menuKey && (
-                              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400 rounded-full pointer-events-none" />
-                            )}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -222,7 +173,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* 2. MAIN CONTENT AREA (중요: 남은 공간 모두 차지) */}
       {/* Header(64px) + Footer(48px) = 112px를 제외한 높이 자동 계산 */}
-      <main className={`flex-1 relative overflow-hidden bg-gray-100 ${isDashboardHome ? 'p-0' : 'p-4'}`}>
+      <main className={`flex-1 relative bg-gray-100 p-0 ${isDashboardHome ? 'overflow-hidden' : 'overflow-y-scroll'}`}>
         <div className="h-full w-full">
           {children}
         </div>
@@ -241,7 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </p>
           </div>
           <p className="text-[11px] font-medium text-gray-400 tracking-wider uppercase">
-            © 2026 TEST.
+            © 2026 LOGIFLOW.
           </p>
         </footer>
       )}
