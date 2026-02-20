@@ -1,25 +1,203 @@
-// app/report/print/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { convertMessage } from "@/utils/aiMessageUtil";
 
-export default function PrintReportPage() {
+// 스텝별 진단 출력 순서 및 레이블 상수
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  Aggregation: '공장',
+  WMS_Inbound: '공장창고(In)',
+  WMS_Outbound: '공장창고(Out)',
+  HUB_Inbound: '물류센터(In)',
+  HUB_Outbound: '물류센터(Out)',
+  W_Stock_Inbound: '도매(In)',
+  W_Stock_Outbound: '도매(Out)',
+  R_Stock_Inbound: '소매(In)',
+  R_Stock_Outbound: '소매(Out)',
+  POS_Sell: '판매완료',
+};
+
+// 유형별 진단 레이블 상수
+const STATUS_LABELS: Record<string, string> = {
+  unregisteredEpc: '미등록 EPC',
+  integrityErrorEpc: '무결성 오류 EPC',
+  clonedEpc: '복제 EPC',
+  redundantEpc: '중복 EPC',
+  invalidLocationMove: '허용되지 않는 거점 이동',
+  impossibleSpeed: '불가능한 이동 속도',
+};
+
+function PrintReportContent() {
+  const searchParams = useSearchParams();
+  const fromDate = searchParams.get("from") || "";
+  const toDate = searchParams.get("to") || "";
+  const productId = searchParams.get("productId") || "";
+
   const [showDetails, setShowDetails] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 브라우저 기본 인쇄 기능 호출
+  // 데이터 상태
+  const [summary, setSummary] = useState({ total: 0, safe: 0, caution: 0, danger: 0 });
+  const [kpiList, setKpiList] = useState<any[]>([]);
+  const [hubStats, setHubStats] = useState<any[]>([]);
+  const [stepStats, setStepStats] = useState<any[]>([]);
+  const [dangerList, setDangerList] = useState<any[]>([]);
+  const [cautionList, setCautionList] = useState<any[]>([]);
+
+  const [productName, setProductName] = useState<string>("전체");
+
+  const getToken = () => {
+    if (typeof window === 'undefined') return '';
+    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
+    if (match) return decodeURIComponent(match[1]);
+    return sessionStorage.getItem('token') || '';
+  };
+
+  useEffect(() => {
+    if (!fromDate || !toDate) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+        const token = getToken();
+        const authHeaders = { Authorization: `Bearer ${token}` };
+
+        // 3개 API 병렬 호출
+        const [initRes, chartRes, listRes] = await Promise.all([
+          fetch(`${backendBaseUrl}/api/v1/dashboard/init-data`, { headers: authHeaders }),
+          fetch(`${backendBaseUrl}/api/v1/dashboard/chart?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}`, { headers: authHeaders }),
+          fetch(`${backendBaseUrl}/api/v1/logis-move/totallist?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}&size=999999`, { headers: authHeaders })
+        ]);
+
+        const initData = await initRes.json();
+        const chartData = await chartRes.json();
+        const listData = await listRes.json();
+
+        if (productId) {
+          const productList = initData.filters?.productList || [];
+          const matchedProduct = productList.find((p: any) => String(p.id) === String(productId));
+          setProductName(matchedProduct ? matchedProduct.label : `알 수 없는 제품(${productId})`);
+        } else {
+          setProductName("전체");
+        }
+
+        // 1. 종합 요약 계산 (3 API 기준)
+        let safe = 0, caution = 0, danger = 0;
+        const contents = listData.content || [];
+        contents.forEach((item: any) => {
+          if (item.checkResult === "SAFE") safe++;
+          else if (item.checkResult === "CAUTION") caution++;
+          else if (item.checkResult === "DANGER") danger++;
+        });
+        setSummary({ total: contents.length, safe, caution, danger });
+
+        // 2. 유형별 진단 (2 API - kpi)
+        setKpiList(chartData.kpi || []);
+
+        // 3. 허브별 진단 (1 API locationList + 2 API hubStatsList)
+        const locationMap = new Map(
+          (initData.locationList || []).map((loc: any) => [loc.locationId, loc.locationName])
+        );
+        const mappedHubStats = (chartData.hubStatsList || []).map((hub: any) => ({
+          name: locationMap.get(hub.locationId) || `알 수 없는 허브(${hub.locationId})`,
+          total: hub.count,
+          caution: hub.cautionCount,
+          danger: hub.errorCount,
+          safe: hub.count - hub.cautionCount - hub.errorCount
+        }));
+        setHubStats(mappedHubStats);
+
+        // 4. 스텝별 진단 (2 API - eventTypeStatsList)
+        // EVENT_TYPE_LABELS 순서대로 정렬하기 위해 Map 활용
+        const stepMap = new Map<string, any>((chartData.eventTypeStatsList || []).map((step: any) => [step.eventType, step]));
+
+        const orderedStepStats = Object.keys(EVENT_TYPE_LABELS).map(key => {
+          const step = stepMap.get(key);
+          if (!step) return null;
+          return {
+            name: EVENT_TYPE_LABELS[key],
+            total: step.count,
+            caution: step.cautionCount,
+            danger: step.errorCount,
+            safe: step.count - step.cautionCount - step.errorCount
+          };
+        }).filter(Boolean); // 데이터가 있는 스텝만 남김
+
+        setStepStats(orderedStepStats);
+
+        // 5. 진단 물류 목록 분류
+        const dList: any[] = [];
+        const cList: any[] = [];
+
+        contents.forEach((item: any) => {
+          if (item.checkResult === "DANGER") dList.push(item);
+          if (item.checkResult === "CAUTION") cList.push(item);
+        });
+
+        setDangerList(dList);
+        setCautionList(cList);
+
+      } catch (error) {
+        console.error("데이터 로딩 중 오류 발생:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [fromDate, toDate, productId]);
+
   const handlePrint = () => {
     window.print();
   };
 
+  // 포맷팅 헬퍼 함수
+  const formatDateTime = (isoString: string) => {
+    if (!isoString) return "";
+    return isoString.replace("T", " "); // 간단히 T만 공백으로 치환
+  };
+
+  const renderDetails = (item: any, type: "DANGER" | "CAUTION") => {
+    const firstDetail = item.details && item.details[0] ? item.details[0] : {};
+
+    return (
+      <div key={item.epcCode} className="mb-4 last:mb-0">
+        <p className="font-bold">
+          {item.productName} (LOT: {firstDetail.epcLot}, SERIAL: {firstDetail.epcSerial}) - EPC: {item.epcCode}
+        </p>
+        <ul className="list-disc pl-5 mt-1 text-gray-700">
+          {item.details.map((detail: any, idx: number) => {
+            if (type === "DANGER" && detail.ruleCheck) {
+              return (
+                <li key={idx}>
+                  <span className="font-semibold text-red-600">위험</span> : {detail.locationName} / {EVENT_TYPE_LABELS[detail.eventType] || detail.eventType} / {formatDateTime(detail.eventTime)} / 사유: {convertMessage(detail.ruleCheck)} ({detail.ruleCheck})
+                </li>
+              );
+            } else if (type === "CAUTION" && detail.aiCheck) {
+              return (
+                <li key={idx}>
+                  <span className="font-semibold text-orange-600">주의</span> : {detail.locationName} / {EVENT_TYPE_LABELS[detail.eventType] || detail.eventType} / {formatDateTime(detail.eventTime)} / 사유: {convertMessage(detail.aiCheck)} ({detail.aiCheck})
+                </li>
+              );
+            }
+            return null;
+          })}
+        </ul>
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center text-xl">데이터를 불러오는 중입니다...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 py-10 font-sans text-black flex justify-center">
-      {/* 
-        A4 사이즈 비율을 모방한 컨테이너.
-        @media print에서 그림자, 마진 등을 제거하고 화면을 채우도록 설정합니다.
-      */}
       <div className="w-[210mm] min-h-[297mm] bg-white shadow-xl border border-gray-300 p-12 relative print:w-full print:h-auto print:shadow-none print:border-none print:p-0 print:m-0">
-        
-        {/* 상단 컨트롤러 (인쇄 시 숨김 - print:hidden) */}
+
+        {/* 상단 컨트롤러 (인쇄 시 숨김) */}
         <div className="absolute top-6 right-12 flex gap-3 print:hidden">
           <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
             <input
@@ -41,17 +219,17 @@ export default function PrintReportPage() {
         {/* 문서 헤더 */}
         <div className="text-center mb-10 mt-4">
           <h1 className="text-3xl font-bold mb-6">물류 진단 리포트</h1>
-          
+
           <div className="flex justify-end text-sm">
             <table className="text-right">
               <tbody>
                 <tr>
-                  <td className="pr-4 font-bold">날짜</td>
-                  <td>: 2026-01-04 ~ 2026-01-11</td>
+                  <td className="pr-4 font-bold">분석 기간 :</td>
+                  <td className="text-left"> {fromDate} ~ {toDate}</td>
                 </tr>
                 <tr>
-                  <td className="pr-4 font-bold">대상 제품</td>
-                  <td>: Product 1</td>
+                  <td className="pr-4 font-bold">대상 제품 :</td>
+                  <td className="text-left"> {productName} </td>
                 </tr>
               </tbody>
             </table>
@@ -59,7 +237,7 @@ export default function PrintReportPage() {
         </div>
 
         <div className="space-y-8">
-          
+
           {/* 종합 요약 */}
           <section>
             <h2 className="text-lg font-bold mb-2">종합 요약</h2>
@@ -74,10 +252,10 @@ export default function PrintReportPage() {
               </thead>
               <tbody>
                 <tr>
-                  <td className="border border-black p-2">1,200</td>
-                  <td className="border border-black p-2">45</td>
-                  <td className="border border-black p-2">5</td>
-                  <td className="border border-black p-2">1,250</td>
+                  <td className="border border-black p-2">{summary.safe.toLocaleString()}</td>
+                  <td className="border border-black p-2">{summary.caution.toLocaleString()}</td>
+                  <td className="border border-black p-2">{summary.danger.toLocaleString()}</td>
+                  <td className="border border-black p-2 font-bold">{summary.total.toLocaleString()}</td>
                 </tr>
               </tbody>
             </table>
@@ -91,44 +269,34 @@ export default function PrintReportPage() {
                 <tr>
                   <th className="border border-black p-2 font-bold">진단 항목</th>
                   <th className="border border-black p-2 font-bold w-32">발생 건수</th>
-                  <th className="border border-black p-2 font-bold w-32">비율</th>
+                  <th className="border border-black p-2 font-bold w-32">비율 (%)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="border border-black p-2">미등록 EPC</td>
-                  <td className="border border-black p-2 text-right">12</td>
-                  <td className="border border-black p-2 text-right">24.0%</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2">무결성 오류 EPC</td>
-                  <td className="border border-black p-2 text-right">8</td>
-                  <td className="border border-black p-2 text-right">16.0%</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2">복제 EPC</td>
-                  <td className="border border-black p-2 text-right">3</td>
-                  <td className="border border-black p-2 text-right">6.0%</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2">중복 EPC</td>
-                  <td className="border border-black p-2 text-right">2</td>
-                  <td className="border border-black p-2 text-right">4.0%</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2">허용되지 않는 거점 이동</td>
-                  <td className="border border-black p-2 text-right">15</td>
-                  <td className="border border-black p-2 text-right">30.0%</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2">불가능한 이동 속도</td>
-                  <td className="border border-black p-2 text-right">10</td>
-                  <td className="border border-black p-2 text-right">20.0%</td>
-                </tr>
+                {Object.keys(STATUS_LABELS).map((statusKey, idx) => {
+                  // API에서 받아온 kpiList 배열 안에 현재 항목(statusKey)이 있는지 찾습니다.
+                  const foundKpi = kpiList.find(kpi => kpi.status === statusKey);
+
+                  // 데이터가 있으면 그 값을, 없으면 0을 사용합니다.
+                  const count = foundKpi ? foundKpi.count : 0;
+                  const ratio = foundKpi ? foundKpi.ratio : 0;
+
+                  return (
+                    <tr key={idx}>
+                      <td className="border border-black p-2">{STATUS_LABELS[statusKey]}</td>
+                      <td className="border border-black p-2 text-right">{count.toLocaleString()}</td>
+                      <td className="border border-black p-2 text-right">{ratio}%</td>
+                    </tr>
+                  );
+                })}
                 <tr className="bg-gray-50 font-bold">
                   <td className="border border-black p-2 text-center">합계</td>
-                  <td className="border border-black p-2 text-right">50</td>
-                  <td className="border border-black p-2 text-right">100.0%</td>
+                  <td className="border border-black p-2 text-right">
+                    {kpiList.reduce((acc, curr) => acc + curr.count, 0).toLocaleString()}
+                  </td>
+                  <td className="border border-black p-2 text-right">
+                    {kpiList.reduce((acc, curr) => acc + curr.ratio, 0).toFixed(2)}%
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -148,27 +316,15 @@ export default function PrintReportPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="border border-black p-2 text-left">OO 공장</td>
-                  <td className="border border-black p-2">400</td>
-                  <td className="border border-black p-2">20</td>
-                  <td className="border border-black p-2">2</td>
-                  <td className="border border-black p-2">422</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2 text-left">물류센터 A</td>
-                  <td className="border border-black p-2">500</td>
-                  <td className="border border-black p-2">15</td>
-                  <td className="border border-black p-2">1</td>
-                  <td className="border border-black p-2">516</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2 text-left">물류센터 B</td>
-                  <td className="border border-black p-2">300</td>
-                  <td className="border border-black p-2">10</td>
-                  <td className="border border-black p-2">2</td>
-                  <td className="border border-black p-2">312</td>
-                </tr>
+                {hubStats.map((hub, idx) => (
+                  <tr key={idx}>
+                    <td className="border border-black p-2 text-left">{hub.name}</td>
+                    <td className="border border-black p-2">{hub.safe.toLocaleString()}</td>
+                    <td className="border border-black p-2">{hub.caution.toLocaleString()}</td>
+                    <td className="border border-black p-2">{hub.danger.toLocaleString()}</td>
+                    <td className="border border-black p-2">{hub.total.toLocaleString()}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </section>
@@ -187,53 +343,43 @@ export default function PrintReportPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="border border-black p-2 text-left">생산</td>
-                  <td className="border border-black p-2">1,000</td>
-                  <td className="border border-black p-2">5</td>
-                  <td className="border border-black p-2">1</td>
-                  <td className="border border-black p-2">1,006</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2 text-left">출고</td>
-                  <td className="border border-black p-2">150</td>
-                  <td className="border border-black p-2">30</td>
-                  <td className="border border-black p-2">3</td>
-                  <td className="border border-black p-2">183</td>
-                </tr>
-                <tr>
-                  <td className="border border-black p-2 text-left">입고</td>
-                  <td className="border border-black p-2">50</td>
-                  <td className="border border-black p-2">10</td>
-                  <td className="border border-black p-2">1</td>
-                  <td className="border border-black p-2">61</td>
-                </tr>
+                {stepStats.map((step, idx) => (
+                  <tr key={idx}>
+                    <td className="border border-black p-2 text-left">{step.name}</td>
+                    <td className="border border-black p-2">{step.safe.toLocaleString()}</td>
+                    <td className="border border-black p-2">{step.caution.toLocaleString()}</td>
+                    <td className="border border-black p-2">{step.danger.toLocaleString()}</td>
+                    <td className="border border-black p-2">{step.total.toLocaleString()}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </section>
 
           {/* 조건부 렌더링 영역: 상세 목록 (인쇄 및 화면 표시 토글) */}
           {showDetails && (
-            <div className="space-y-8 print:break-before-page">
+            <div className="space-y-8 print:break-before-page mt-8">
               {/* 진단 물류 목록 (위험) */}
               <section>
-                <h2 className="text-lg font-bold mb-2">진단 물류 목록 (위험)</h2>
-                <div className="min-h-[150px] border border-black p-4 text-sm whitespace-pre-wrap text-red-600">
-                  {/* 실제 데이터가 들어갈 자리 */}
-                  EPC: urn:epc:id:sgtin:0614141.107346.2024 (사유: 불가능한 이동 속도)
-                  EPC: urn:epc:id:sgtin:0614141.107346.2025 (사유: 무결성 오류 EPC)
-                  EPC: urn:epc:id:sgtin:0614141.107346.2026 (사유: 허용되지 않는 거점 이동)
+                <h2 className="text-lg font-bold mb-2 text-red-700">진단 물류 목록 (위험)</h2>
+                <div className="min-h-[100px] border border-black p-4 text-sm whitespace-pre-wrap">
+                  {dangerList.length === 0 ? (
+                    <span className="text-gray-500">위험 진단 물류가 없습니다.</span>
+                  ) : (
+                    dangerList.map(item => renderDetails(item, "DANGER"))
+                  )}
                 </div>
               </section>
 
               {/* 진단 물류 목록 (주의) */}
               <section>
-                <h2 className="text-lg font-bold mb-2">진단 물류 목록 (주의)</h2>
-                <div className="min-h-[150px] border border-black p-4 text-sm whitespace-pre-wrap text-orange-600">
-                  {/* 실제 데이터가 들어갈 자리 */}
-                  EPC: urn:epc:id:sgtin:0614141.107346.3001 (사유: 미등록 EPC)
-                  EPC: urn:epc:id:sgtin:0614141.107346.3002 (사유: 미등록 EPC)
-                  ... (이하 생략)
+                <h2 className="text-lg font-bold mb-2 text-orange-600">진단 물류 목록 (주의)</h2>
+                <div className="min-h-[100px] border border-black p-4 text-sm whitespace-pre-wrap">
+                  {cautionList.length === 0 ? (
+                    <span className="text-gray-500">주의 진단 물류가 없습니다.</span>
+                  ) : (
+                    cautionList.map(item => renderDetails(item, "CAUTION"))
+                  )}
                 </div>
               </section>
             </div>
@@ -242,5 +388,13 @@ export default function PrintReportPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PrintReportPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">로딩 중...</div>}>
+      <PrintReportContent />
+    </Suspense>
   );
 }
