@@ -54,6 +54,21 @@ export function useRawDashboardData(
       const n = Number(v);
       return Number.isFinite(n) ? n : null;
     };
+    const resolveLogisMoveId = (detail?: any) =>
+      safeNumber(
+        detail?.logisMoveId ??
+        detail?.logis_move_id ??
+        detail?.logisLogId ??
+        detail?.logis_log_id ??
+        detail?.logisMove?.id ??
+        detail?.id ??
+        raw.logisMoveId ??
+        raw.logis_move_id ??
+        raw.logisLogId ??
+        raw.logis_log_id ??
+        raw.logisMove?.id ??
+        raw.id
+      );
     const toStatus = (value: any): RiskItem['st'] => {
       const rawValue = safe(value).toUpperCase();
       if (rawValue === 'DANGER') return 'DANGER';
@@ -81,6 +96,7 @@ export function useRawDashboardData(
     if (Array.isArray(raw.details) && raw.details.length > 0) {
       return raw.details.map((detail: any, index: number) => ({
         id: safe(raw.id || raw.logisLogId || `${base.epcCode}-${detail?.epcSerial ?? 'unknown'}-${index}`),
+        logisMoveId: resolveLogisMoveId(detail),
         epcCode: base.epcCode,
         scanLocation: safe(detail?.locationName || detail?.scanLocation || ''),
         locationId: safe(detail?.locationId || detail?.location_id || base.locationId),
@@ -106,6 +122,7 @@ export function useRawDashboardData(
 
     return [{
       id: safe(raw.id || raw.logisLogId || `${base.epcCode}-${base.eventTime}`),
+      logisMoveId: resolveLogisMoveId(),
       epcCode: base.epcCode,
       scanLocation: safe(raw.scanLocation || raw.locationName || raw.location_id || raw.locationId),
       locationId: base.locationId,

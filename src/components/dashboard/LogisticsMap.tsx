@@ -55,6 +55,8 @@ class PatternArcLayer<DataT = unknown> extends ArcLayer<
   DataT,
   { patternRepeat?: number; patternPhase?: number }
 > {
+  static layerName = 'PatternArcLayer';
+  // 또는 static componentName = 'PatternArcLayer';
   getShaders() {
     const patternRepeat = Math.max(1, Number(this.props.patternRepeat ?? 20));
     const shaders = super.getShaders();
@@ -516,7 +518,7 @@ export default function LogisticsMap({
       ? { min: Math.min(...routeDistances), max: Math.max(...routeDistances) }
       : { min: 0, max: 0 };
     const getScaledHeightByDistance = (source: [number, number], target: [number, number]) => {
-      const minHeight = 0.3;
+      const minHeight = 0.30;
       const maxHeight = 0.60;
       const distance = getDistanceKm(source, target);
       if (!Number.isFinite(distance) || distance <= 0) return FALLBACK_ARC_HEIGHT;

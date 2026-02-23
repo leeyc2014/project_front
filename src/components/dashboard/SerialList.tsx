@@ -27,16 +27,27 @@ type InspectionFormProps = {
   serialNumber: string;
   anomalyByLocation: {
     location: string;
-    messages: { text: string; severity: 'DANGER' | 'CAUTION' | 'NONE' }[];
+    messages: { text: string; severity: 'DANGER' | 'CAUTION' | 'NONE'; logisMoveId: number | null }[];
   }[];
   onClose: () => void;
 };
 type ReportSeverity = 'DANGER' | 'CAUTION' | 'NONE';
 type ReportAnomalyByLocation = {
   location: string;
-  messages: { text: string; severity: ReportSeverity }[];
+  messages: { text: string; severity: ReportSeverity; logisMoveId: number | null }[];
 }[];
 
+function getToken(): string {
+  if (typeof window === 'undefined') return '';
+  const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
+  if (match) return decodeURIComponent(match[1]);
+  return sessionStorage.getItem('token') || '';
+}
+
+function formatTimestamp6(date: Date): string {
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
 
 const InspectionForm: React.FC<InspectionFormProps> = ({
   isOpen,
@@ -44,12 +55,14 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
   anomalyByLocation,
   onClose,
 }) => {
-  const locationOptions = anomalyByLocation.length > 0 ? anomalyByLocation : [{ location: '-', messages: [{ text: '-', severity: 'NONE' as const }] }];
+  const locationOptions = anomalyByLocation.length > 0 ? anomalyByLocation : [{ location: '-', messages: [{ text: '-', severity: 'NONE' as const, logisMoveId: null }] }];
   const [selectedLocation, setSelectedLocation] = useState(locationOptions[0].location);
   const selectedLocationItem =
     locationOptions.find((item) => item.location === selectedLocation) ?? locationOptions[0];
-  const messageOptions = selectedLocationItem.messages.length > 0 ? selectedLocationItem.messages : [{ text: '-', severity: 'NONE' as const }];
+  const messageOptions = selectedLocationItem.messages.length > 0 ? selectedLocationItem.messages : [{ text: '-', severity: 'NONE' as const, logisMoveId: null }];
   const [selectedMessage, setSelectedMessage] = useState(messageOptions[0].text);
+  const [detailMessage, setDetailMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const nextLocation = locationOptions[0].location;
@@ -70,13 +83,55 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
       : selectedMessageObj.severity === 'CAUTION'
         ? 'border-yellow-700 bg-yellow-900/35 text-yellow-100'
         : 'border-gray-700 bg-gray-800 text-white';
+  useEffect(() => {
+    const defaultDetail = convertMessage(selectedMessageObj.text) || selectedMessageObj.text || '-';
+    setDetailMessage(`${defaultDetail}\n`);
+  }, [selectedLocation, selectedMessage, selectedMessageObj.text]);
+
   const initialDetailMessage = messageOptions[0].text + '\n';
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
-    alert('보고서가 정상적으로 제출되었습니다.');
-    onClose();
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (selectedMessageObj.logisMoveId == null) {
+      alert('보고 대상 이벤트를 찾을 수 없습니다.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+      const token = getToken();
+      const payload = {
+        logisMoveId: selectedMessageObj.logisMoveId,
+        detail: initialDetailMessage.replace(/\r?\n$/, '') || (convertMessage(selectedMessageObj.text) || selectedMessageObj.text),
+        result: '',
+        completed: false,
+        reportDate: formatTimestamp6(new Date()),
+      };
+      console.info('anomaly report create payload:', payload);
+      const res = await fetch(`${backendBaseUrl}/api/v1/anomaly-reports`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}${errorText ? ` - ${errorText}` : ''} (logisMoveId=${selectedMessageObj.logisMoveId})`);
+      }
+      alert('보고서가 정상적으로 제출되었습니다.');
+      onClose();
+    } catch (error) {
+      console.error('anomaly report post failed:', error);
+      const message = error instanceof Error ? error.message : 'unknown error';
+      alert(`보고서 제출에 실패했습니다.\n${message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -127,7 +182,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
                 onChange={(e) => setSelectedMessage(e.target.value)}
               >
                 {messageOptions.map((message, index) => (
-                  <option key={`${index}`} value={convertMessage(message.text)} className="bg-gray-900 text-white">
+                  <option key={`${index}`} value={message.text} className="bg-gray-900 text-white">
                     {convertMessage(message.text)}
                   </option>
                 ))}
@@ -144,9 +199,9 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
             <textarea
               placeholder="공장 정보, 발생 시점 및 구체적인 상황을 입력하세요."
               className="min-h-24 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder:text-gray-400"
-            >
-              {initialDetailMessage}
-            </textarea>
+              value={initialDetailMessage}
+              onChange={(e) => setDetailMessage(e.target.value)}
+            />
           </div>
         </div>
 
@@ -154,8 +209,12 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
           <button onClick={onClose} className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-bold text-white hover:bg-gray-800">
             취소
           </button>
-          <button onClick={handleSubmit} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
-            조치 요청 제출
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? '제출 중...' : '조치 요청 제출'}
           </button>
         </div>
       </div>
@@ -322,23 +381,32 @@ const SerialList: React.FC<SerialListProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const locationMap = new Map<string, Map<string, 'DANGER' | 'CAUTION'>>();
+                            const toLogisMoveId = (value: unknown): number | null => {
+                              const parsed = Number(value);
+                              return Number.isFinite(parsed) ? parsed : null;
+                            };
+                            const locationMap = new Map<string, Map<string, { severity: 'DANGER' | 'CAUTION'; logisMoveId: number | null }>>();
                             items.forEach((event) => {
                               const location = (event.scanLocation || '-').trim() || '-';
                               const rule = (event.ruleCheck || '').trim();
                               const ai = (event.aiCheck || '').trim();
+                              const logisMoveId = toLogisMoveId(event.logisMoveId ?? event.id);
                               if (!rule && !ai) return;
-                              if (!locationMap.has(location)) locationMap.set(location, new Map<string, 'DANGER' | 'CAUTION'>());
-                              if (rule) locationMap.get(location)!.set(rule, 'DANGER');
-                              if (ai && !locationMap.get(location)!.has(ai)) locationMap.get(location)!.set(ai, 'CAUTION');
+                              if (!locationMap.has(location)) locationMap.set(location, new Map<string, { severity: 'DANGER' | 'CAUTION'; logisMoveId: number | null }>());
+                              if (rule) locationMap.get(location)!.set(rule, { severity: 'DANGER', logisMoveId });
+                              if (ai && !locationMap.get(location)!.has(ai)) locationMap.get(location)!.set(ai, { severity: 'CAUTION', logisMoveId });
                             });
                             const anomalyByLocation: ReportAnomalyByLocation = Array.from(locationMap.entries()).map(([location, messageMap]) => ({
                               location,
-                              messages: Array.from(messageMap.entries()).map(([text, severity]) => ({ text, severity })),
+                              messages: Array.from(messageMap.entries()).map(([text, meta]) => ({
+                                text,
+                                severity: meta.severity,
+                                logisMoveId: meta.logisMoveId,
+                              })),
                             }));
                             if (anomalyByLocation.length === 0) {
                               const fallbackLocation = (first?.scanLocation || '-').trim() || '-';
-                              anomalyByLocation.push({ location: fallbackLocation, messages: [{ text: '-', severity: 'NONE' }] });
+                              anomalyByLocation.push({ location: fallbackLocation, messages: [{ text: '-', severity: 'NONE', logisMoveId: toLogisMoveId(first?.logisMoveId ?? first?.id) }] });
                             }
                             setReportTarget({
                               serial,
