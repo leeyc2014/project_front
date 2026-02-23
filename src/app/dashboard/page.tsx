@@ -9,7 +9,7 @@ import SerialList from '@/components/dashboard/SerialList';
 import FilterPanel from '@/components/dashboard/FilterPanel';
 import ChartSection, { EpcTimelineModal } from '@/components/dashboard/ChartSection';
 import DashboardLoadingOverlay from '@/components/dashboard/DashboardLoadingOverlay';
-import type { RouteData } from '@/components/dashboard/LogisticsMap';
+import type { RouteData } from '@/types/logisticsMap';
 
 const LogisticsMap = dynamic(() => import('@/components/dashboard/LogisticsMap'), {
   ssr: false,
@@ -31,23 +31,12 @@ export default function DashboardPage() {
   const rawPage = searchParams.get('page');
   const rawSize = searchParams.get('size');
   const rawStatus = searchParams.get('status') || searchParams.get('st');
-  const rawStartDate = searchParams.get('startDate');
-  const rawEndDate = searchParams.get('endDate');
   const parsedPage = rawPage ? Number.parseInt(rawPage, 10) : NaN;
   const pageParam = Number.isFinite(parsedPage) && parsedPage >= 0 ? parsedPage : undefined;
   const page = pageParam ?? 0;
   const parsedSize = rawSize ? Number.parseInt(rawSize, 10) : NaN;
   const size = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : undefined;
   const status = (rawStatus || 'ALL') as 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER';
-  const startDate = rawStartDate || '2025-01-01';
-  const endDate = rawEndDate || '2026-02-28';
-  const epcCodeQuery = (searchParams.get('epcCode') || '').trim();
-  const isSingleEpcCodeMode = useMemo(() => {
-    if (!epcCodeQuery) return false;
-    const allowedKeys = new Set(['epcCode', 'page', 'size', 'eventTimeStart', 'eventTimeEnd']);
-    const keys = Array.from(searchParams.keys());
-    return keys.every((key) => allowedKeys.has(key));
-  }, [epcCodeQuery, searchParams]);
 
   const parseIds = (value: string | null): string[] => {
     if (!value) return [];
@@ -65,7 +54,7 @@ export default function DashboardPage() {
   };
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const { backendEvents, uploadedEvents, backendRoutes, filterOptions, locationList, totalPages, totalElements, isLoading } = useRawDashboardData(pageParam, size, status, filters);
+  const { backendEvents, filterOptions, locationList, totalPages, totalElements, isLoading } = useRawDashboardData(pageParam, size, status, filters);
   const [chartData, setChartData] = useState<any>(null);
   const [isChartLoading, setIsChartLoading] = useState(true);
   const hubLocationMap = useMemo(() => {
@@ -136,7 +125,7 @@ export default function DashboardPage() {
   }, [chartData, locationList]);
 
   const mergedEvents = useMemo(() => {
-    const merged = [...backendEvents, ...uploadedEvents];
+    const merged = [...backendEvents];
     const seen = new Set<string>();
     return merged.filter((e) => {
       const key = `${e.epcCode}|${e.eventTime || ''}|${e.eventType || ''}|${e.detailIndex ?? ''}|${e.scanLocation || ''}`;
@@ -144,7 +133,7 @@ export default function DashboardPage() {
       seen.add(key);
       return true;
     });
-  }, [backendEvents, uploadedEvents]);
+  }, [backendEvents]);
 
   const filteredEvents = useMemo(() => {
     const normalizeDate = (value: string) => (value || '').slice(0, 10);
@@ -327,7 +316,7 @@ export default function DashboardPage() {
 
     fetchCharts();
     return () => controller.abort();
-  }, [backendBaseUrl, filters, status, startDate, endDate]);
+  }, [backendBaseUrl, filters, status]);
 
   // RESET MAP 기능 (원본 로직 반영) [cite: 270, 272]
   const handleResetMap = useCallback(() => {
@@ -588,10 +577,9 @@ export default function DashboardPage() {
       <div className="absolute inset-0">
         <LogisticsMap
           epcFilter={mapRoutes.length > 0 ? null : (activeSerial ? [activeSerial] : serials)}
-          routes={isMapPending ? [] : (mapRoutes.length > 0 ? mapRoutes : backendRoutes)}
+          routes={isMapPending ? [] : (mapRoutes.length > 0 ? mapRoutes : [])}
           resetToken={resetToken}
           viewportPadding={mapPadding}
-          isEpcFocused={isSingleEpcCodeMode}
           onRouteStatusSelect={handleStatusChange}
           patternAnimationEnabled={isPatternAnimationEnabled}
         />
@@ -773,7 +761,6 @@ export default function DashboardPage() {
                   statusFilter={status}
                   onStatusChange={handleStatusChange}
                   page={page}
-                  size={size ?? 15}
                   totalPages={totalPages}
                   totalElements={totalElements}
                   onPageChange={handlePageChange}

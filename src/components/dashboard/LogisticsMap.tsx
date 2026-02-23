@@ -5,33 +5,7 @@ import { Map as MapLibreMap, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { ArcLayer, ScatterplotLayer } from '@deck.gl/layers';
-
-// --- Types ---
-export interface RouteData {
-  count: number;
-  cautionCount?: number;
-  errorCount?: number;
-  source_info: { id: string; name: string; coords: [number, number] };
-  target_info: { id: string; name: string; coords: [number, number] };
-  epc_list: string[];
-}
-
-export type TrackingPoint = {
-  coords: [number, number];
-  t: number;
-  label: string;
-};
-
-type LogisticsMapProps = {
-  epcFilter?: string[] | null;
-  routes?: RouteData[];
-  trackingPath?: TrackingPoint[] | null;
-  resetToken?: number;
-  viewportPadding?: { top: number; bottom: number; left: number; right: number };
-  isEpcFocused?: boolean;
-  onRouteStatusSelect?: (status: 'SAFE' | 'CAUTION' | 'DANGER') => void;
-  patternAnimationEnabled?: boolean;
-};
+import type { LogisticsMapProps, RouteData } from '@/types/logisticsMap';
 
 const INITIAL_CENTER: [number, number] = [128.1, 35.3];
 const INITIAL_ZOOM = 7.5;
@@ -120,7 +94,6 @@ export default function LogisticsMap({
   const [patternPhase, setPatternPhase] = useState(0);
   const isValidCoords = (coords: [number, number] | undefined) =>
     Array.isArray(coords) && coords.length === 2 && coords.every((v) => Number.isFinite(v));
-  const KOREA_BOUNDS: [[number, number], [number, number]] = [[124.6, 33.1], [131.9, 38.7]];
   const getRouteColor = (route: RouteData): [number, number, number, number] => {
     const totalCount = Math.max(0, Number(route.count ?? 0) || 0);
     const cautionCount = Math.max(0, Number(route.cautionCount ?? 0) || 0);

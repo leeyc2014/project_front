@@ -4,7 +4,7 @@ import { loginUserAtom } from '@/atoms/atom';
 import { User } from '@/types/user';
 import { useAtom } from 'jotai';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState, useEffect, useRef } from "react";
+import { FormEvent, useRef } from "react";
 
 // --- Helper components for icons ---
 const UserIcon = () => (
@@ -26,7 +26,6 @@ export default function Page() {
     const router = useRouter();
 
     const [loginUser, setLoginUser] = useAtom<User | null>(loginUserAtom);
-    const [loginState, setLoginState] = useState<boolean | null>(null);
 
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
     const defaultDashboardQuery = 'eventTimeStart=2024-07-25&eventTimeEnd=2024-07-31';
@@ -97,16 +96,6 @@ export default function Page() {
             alert("서버와 통신할 수 없습니다. 백엔드 서버가 켜져 있는지 확인하세요.");
         }
     };
-
-    // 기존의 useEffect 로직 유지 (불필요한 fetch는 에러 방지를 위해 주석 처리)
-    useEffect(() => {
-        if (!loginUser) {
-            setLoginState(false);
-            return;
-        }
-        // 추후 사용자 세션 체크 로직이 필요할 때 작성
-        setLoginState(true);
-    }, [loginUser]);
 
     return (
         <main className="flex items-center justify-center min-h-screen bg-gray-900 text-white p-4" 

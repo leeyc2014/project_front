@@ -1,9 +1,10 @@
-// app/anomaly-reports/page.tsx
+﻿// app/anomaly-reports/page.tsx
 "use client";
 
 import { EVENT_TYPE_LABELS } from "@/constants/eventType";
 import { convertMessage } from "@/utils/aiMessageUtil";
 import React, { useState, useEffect, useCallback } from "react";
+import type { AnomalyReport, BadgeColor, FilterItem, FilterMaps, PageInfo } from "@/types/anomalyPage";
 
 /* ── 코드 → 한글 상수 맵 ────────────────────────────── */
 
@@ -17,53 +18,6 @@ const LOCATION_TYPE_KO: Record<string, string> = {
 
 function ko(map: Record<string, string>, code: string): string {
   return map[code] ?? code;
-}
-
-
-/* ── 타입 ───────────────────────────────────────────── */
-interface FilterItem { id: number; label: string; }
-
-interface FilterMaps {
-  locationById: Map<number, string>;
-  operatorById: Map<number, string>;
-  deviceById:   Map<number, string>;
-  companyById:  Map<number, string>;
-  productById:  Map<number, string>;
-}
-
-interface Location {
-  locationId: number; locationName: string;
-  initial: string; longtitude: number; latitude: number; type: string;
-}
-interface Epc {
-  epcCode: string;
-  company: { epcCompany: number; companyName: string };
-  product: { epcProduct: number; productName: string; company: { epcCompany: number; companyName: string } };
-  epcSerial: number;
-  lot: { epcLot: number; lotName: string | null };
-  manufactureDate: string; expiryDate: string;
-}
-interface LogisMove {
-  id: number;
-  location: Location;
-  hubType: string; businessStep: string; eventType: string;
-  operator: { operatorId: number; operatorName: string; location: Location };
-  device: { deviceId: number; deviceName: string; location: Location };
-  epc: Epc;
-  eventTime: string; aiCheck: string | null; ruleCheck: string | null;
-  epcCode: string; operatorId: number; deviceId: number; locationId: number;
-}
-interface AnomalyReport {
-  id: number;
-  logisMove: LogisMove;
-  detail: string;
-  result: string;
-  reportDate: string;
-  completed: boolean;   // ← 추가
-}
-interface PageInfo {
-  totalElements: number; totalPages: number; number: number;
-  size: number; first: boolean; last: boolean; numberOfElements: number;
 }
 
 /* ── 유틸 ───────────────────────────────────────────── */
@@ -106,7 +60,6 @@ function buildFilterMaps(data: any): FilterMaps {
 }
 
 /* ── 서브 컴포넌트 ──────────────────────────────────── */
-type BadgeColor = "blue" | "green" | "yellow" | "red" | "purple" | "gray";
 
 function InfoRow({
   label, value, mono = false, badge = false, badgeColor = "blue",

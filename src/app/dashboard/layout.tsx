@@ -1,5 +1,5 @@
 ﻿"use client";
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import HeaderUploadWidget from '@/components/dashboard/HeaderUploadWidget';
@@ -16,11 +16,9 @@ const Icon = ({ path, className }: { path: string; className: string }) => (
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [loginUser] = useAtom<User | null>(loginUserAtom);
 
-  const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [selectedMenu, setSelectedMenu] = useState('dashboard');
   const [displayName, setDisplayName] = useState('—');
   const [isAuthorized, setIsAuthorized] = useState(true);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardHome = pathname === '/dashboard';
@@ -98,10 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex flex-col h-screen w-screen bg-gray-100 font-sans text-gray-900 overflow-hidden">
 
       {/* HEADER (64px 고정) */}
-      <header
-        className="relative z-50 bg-gray-900 text-white shadow-lg flex-none"
-        onMouseLeave={() => setHoveredMenu(null)}
-      >
+      <header className="relative z-50 bg-gray-900 text-white shadow-lg flex-none">
         <div className="h-16 flex items-center justify-between px-8 border-b border-gray-800 relative z-20 bg-gray-900">
           <div className="flex items-center space-x-12 shrink-0">
             <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">LOGIFLOW</h1>
@@ -113,7 +108,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       href={item.url}
                       onClick={() => {
                         setSelectedMenu(item.key);
-                        setHoveredMenu(null);
                       }}
                       className={`flex items-center font-bold px-1 transition-all ${selectedMenu === item.key
                           ? 'border-blue-500 text-blue-500'

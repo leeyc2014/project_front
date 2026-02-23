@@ -1,41 +1,12 @@
 ﻿'use client';
 
 import React, { useEffect, useState } from 'react';
-import { RiskItem } from '@/types/dashboard';
 import { convertMessage } from '@/utils/aiMessageUtil';
 import { useAtom } from 'jotai';
 import { User } from '@/types/user';
 import { loginUserAtom } from '@/atoms/atom';
 import { EVENT_TYPE_LABELS } from '@/constants/eventType';
-
-type SerialListProps = {
-  page: number;
-  size: number;
-  totalPages: number;
-  totalElements?: number;
-  onPageChange: (page: number) => void;
-  statusFilter: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER';
-  onStatusChange: (status: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER') => void;
-  serials: string[];
-  eventsBySerial: Record<string, RiskItem[]>;
-  activeSerial: string | null;
-  onSerialToggle: (serial: string) => void;
-};
-
-type InspectionFormProps = {
-  isOpen: boolean;
-  serialNumber: string;
-  anomalyByLocation: {
-    location: string;
-    messages: { text: string; severity: 'DANGER' | 'CAUTION' | 'NONE'; logisMoveId: number | null }[];
-  }[];
-  onClose: () => void;
-};
-type ReportSeverity = 'DANGER' | 'CAUTION' | 'NONE';
-type ReportAnomalyByLocation = {
-  location: string;
-  messages: { text: string; severity: ReportSeverity; logisMoveId: number | null }[];
-}[];
+import type { InspectionFormProps, ReportAnomalyByLocation, SerialListProps } from '@/types/serialList';
 
 function getToken(): string {
   if (typeof window === 'undefined') return '';

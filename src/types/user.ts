@@ -4,11 +4,3 @@ export type User = {
     name : string,
     role : 'USER' | 'ADMIN'
 }
-
-// 회원 관리용
-export interface Member {
-    id : string;
-    name : string;
-    role : 'USER' | 'ADMIN';
-    enabled : boolean;
-}

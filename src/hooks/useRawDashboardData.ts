@@ -1,16 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { FilterOptions, RiskItem, FilterState } from '@/types/dashboard';
-
-type LocationItem = {
-  locationId: number | string;
-  locationName: string;
-  longtitude?: number | null;
-  longitude?: number | null;
-  latitude?: number | null;
-  lat?: number | null;
-  lng?: number | null;
-  type?: string;
-};
+import type { LocationItem } from '@/types/useRawDashboardData';
 
 export function useRawDashboardData(
   page?: number,
@@ -19,8 +9,6 @@ export function useRawDashboardData(
   filters: FilterState | null = null
 ) {
   const [backendEvents, setBackendEvents] = useState<RiskItem[]>([]);
-  const [uploadedEvents, setUploadedEvents] = useState<RiskItem[]>([]);
-  const [backendRoutes, setBackendRoutes] = useState<any[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
@@ -35,7 +23,6 @@ export function useRawDashboardData(
   });
   const [locationList, setLocationList] = useState<LocationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitLoading, setIsInitLoading] = useState(true);
   const lastDeniedListRequestRef = useRef<string>('');
 
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
@@ -309,7 +296,6 @@ export function useRawDashboardData(
     const controller = new AbortController();
     const fetchOptions = async () => {
       try {
-        setIsInitLoading(true);
         const safeJson = async (res: Response) => {
           if (!res.ok) return null;
           const text = await res.text();
@@ -391,8 +377,6 @@ export function useRawDashboardData(
         if ((err as { name?: string })?.name !== 'AbortError') {
           console.error("Fetch Error:", err);
         }
-      } finally {
-        setIsInitLoading(false);
       }
     };
     fetchOptions();
@@ -401,5 +385,5 @@ export function useRawDashboardData(
     };
   }, [backendBaseUrl]);
 
-  return { backendEvents, uploadedEvents, backendRoutes, filterOptions, locationList, totalPages, totalElements, isLoading, isInitLoading };
+  return { backendEvents, filterOptions, locationList, totalPages, totalElements, isLoading };
 }

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import type { PeriodRange, Product, RangeType } from "@/types/reportPage";
 
 /* ─── 유틸 ─────────────────────────────────────────── */
 
@@ -24,18 +25,6 @@ function fmt(date: Date): string {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}.${m}.${d} (${days[date.getDay()]})`;
 }
-
-interface PeriodRange {
-  from: Date;
-  to: Date;
-}
-
-interface Product {
-  id: string | number;
-  label: string;
-}
-
-type RangeType = "WEEKLY" | "MONTHLY";
 
 function buildRanges(fromStr: string, toStr: string, today: Date, type: RangeType): PeriodRange[] {
   const from = parseLocal(fromStr);

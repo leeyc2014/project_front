@@ -2,27 +2,16 @@
 
 import React, { useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import type { DashboardResponse, RiskItem } from '@/types/dashboard';
+import type { RiskItem } from '@/types/dashboard';
+import { EVENT_TYPE_LABELS } from '@/constants/eventType';
+import type {
+  BarOptionsConfig,
+  ChartSectionProps,
+  TimelineModalProps,
+  XAxisCategory,
+} from '@/types/chartSection';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
-
-type ChartVariant = 'kpi' | 'hub' | 'eventType';
-
-type ChartSectionProps = {
-  variant: ChartVariant;
-  data?: Partial<DashboardResponse> | null;
-  hubLocationMap?: Record<string, string>;
-};
-
-type TimelineModalProps = {
-  open: boolean;
-  serial: string | null;
-  events: RiskItem[];
-  onClose: () => void;
-  onApplyEpcFilter?: (epcCode: string) => void;
-  onClearEpcFilter?: () => void;
-  isEpcFilterApplied?: boolean;
-};
 
 const KPI_LABELS = [
   { key: 'unregisteredEpc', label: '미등록 EPC' },
@@ -33,18 +22,6 @@ const KPI_LABELS = [
   { key: 'impossibleSpeed', label: '불가능한 이동 속도' },
 ] as const;
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  AGGREGATION: '공장',
-  WMS_INBOUND: '공장창고(In)',
-  WMS_OUTBOUND: '공장창고(Out)',
-  HUB_INBOUND: '물류센터(In)',
-  HUB_OUTBOUND: '물류센터(Out)',
-  W_STOCK_INBOUND: '도매(In)',
-  W_STOCK_OUTBOUND: '도매(Out)',
-  R_STOCK_INBOUND: '소매(In)',
-  R_STOCK_OUTBOUND: '소매(Out)',
-  POS_SELL: '판매완료',
-};
 
 const EVENT_TYPE_DISPLAY_ORDER = [
   '공장',
@@ -123,24 +100,6 @@ const resolveEventTypeLabel = (raw: string) => {
     .replace(/^_+|_+$/g, '');
   return EVENT_TYPE_LABELS[normalized] || EVENT_TYPE_LABELS[normalized.replace(/_/g, '')] || source;
 };
-
-type BarOptionsConfig = {
-  compact?: boolean;
-  xLabelRotate?: number;
-  xLabelMaxHeight?: number;
-  xLabelFormatter?: (value: string) => string;
-  dataLabelsEnabled?: boolean;
-  dataLabelFormatter?: (value: number) => string;
-  stacked?: boolean;
-  showStackTotal?: boolean;
-  columnWidth?: string;
-  gridPaddingTop?: number;
-  gridPaddingBottom?: number;
-  colors?: string[];
-  horizontal?: boolean;
-};
-
-type XAxisCategory = string | string[];
 
 const buildBarOptions = (
   categories: XAxisCategory[],

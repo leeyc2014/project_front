@@ -1,30 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-interface CompleteSummary {
-  totalProcessed?: number;
-  safeCount?: number;
-  errorCount?: number;
-  cautionCount?: number;
-  integrityErrorCount?: number;
-}
-
-interface LogisticsData {
-  message?: unknown;
-  percent?: number;
-  event?: "init" | "progress" | "complete" | string;
-  totalProcessed?: number;
-  safeCount?: number;
-  errorCount?: number;
-  cautionCount?: number;
-  integrityErrorCount?: number;
-}
-
-interface LogEntry {
-  time: string;
-  message: string;
-}
+import type { CompleteSummary, LogisticsData, LogEntry } from "@/types/headerUploadWidget";
 
 const DEFAULT_FILE_LABEL = "No file selected";
 

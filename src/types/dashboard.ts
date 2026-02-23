@@ -116,12 +116,3 @@ export const DEFAULT_FILTERS: FilterState = {
   manufactureDate: '',
   expiryDate: '',
 };
-
-export const CHART_COLORS = {
-  blue: '#3b82f6',
-  orange: '#f97316',
-  green: '#22c55e',
-  red: '#ef4444',
-  purple: '#8b5cf6',
-  teal: '#14b8a6',
-};
