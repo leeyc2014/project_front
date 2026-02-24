@@ -10,6 +10,8 @@ import FilterPanel from '@/components/dashboard/FilterPanel';
 import ChartSection, { EpcTimelineModal } from '@/components/dashboard/ChartSection';
 import DashboardLoadingOverlay from '@/components/dashboard/DashboardLoadingOverlay';
 import type { RouteData } from '@/types/logisticsMap';
+import { useAtom } from 'jotai';
+import { dashboardReloadTriggerAtom } from '@/atoms/atom';
 
 const LogisticsMap = dynamic(() => import('@/components/dashboard/LogisticsMap'), {
   ssr: false,
@@ -175,6 +177,7 @@ export default function DashboardPage() {
   const chartsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChartRequestKeyRef = useRef<string>('');
   const chartRequestIdRef = useRef(0);
+  const [dashboardReloadTrigger, setDashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
 
   const mapWrapRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -215,6 +218,7 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   useEffect(() => {
+    console.log('fetch charts!!!');
     if (!backendBaseUrl) {
       setIsChartLoading(false);
       return;
@@ -253,6 +257,7 @@ export default function DashboardPage() {
         setIfPresent(query, 'eventTimeEnd', filters.eventTimeEnd || '');
         setIfPresent(query, 'manufactureDate', filters.manufactureDate || '');
         setIfPresent(query, 'expiryDate', filters.expiryDate || '');
+        query.set('_t', dashboardReloadTrigger.toString());
 
         const queryString = query.toString();
         const url = queryString
@@ -316,7 +321,7 @@ export default function DashboardPage() {
 
     fetchCharts();
     return () => controller.abort();
-  }, [backendBaseUrl, filters, status]);
+  }, [backendBaseUrl, filters, status, dashboardReloadTrigger]);
 
   // RESET MAP 기능 (원본 로직 반영) [cite: 270, 272]
   const handleResetMap = useCallback(() => {

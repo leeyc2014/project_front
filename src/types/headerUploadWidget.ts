@@ -3,6 +3,11 @@ export interface CompleteSummary {
   safeCount?: number;
   errorCount?: number;
   cautionCount?: number;
+  locationErrorCount?: number;
+  timeErrorCount?: number;
+  clonedCount?: number;
+  redundantCount?: number;
+  unregisteredCount?: number;
   integrityErrorCount?: number;
 }
 

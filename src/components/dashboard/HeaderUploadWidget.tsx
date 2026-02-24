@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CompleteSummary, LogisticsData, LogEntry } from "@/types/headerUploadWidget";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAtom } from "jotai";
+import { dashboardReloadTriggerAtom } from "@/atoms/atom";
 
 const DEFAULT_FILE_LABEL = "No file selected";
 
@@ -26,6 +29,13 @@ const readCompleteSummary = (payload: unknown): CompleteSummary | null => {
     "safeCount" in obj ||
     "errorCount" in obj ||
     "cautionCount" in obj ||
+
+    "locationErrorCount" in obj ||
+    "timeErrorCount" in obj ||
+
+    "clonedCount" in obj ||
+    "redundantCount" in obj ||
+    "unregisteredCount" in obj ||
     "integrityErrorCount" in obj;
   if (!hasSummaryKey) return null;
 
@@ -34,11 +44,23 @@ const readCompleteSummary = (payload: unknown): CompleteSummary | null => {
     safeCount: toFiniteNumber(obj.safeCount),
     errorCount: toFiniteNumber(obj.errorCount),
     cautionCount: toFiniteNumber(obj.cautionCount),
+
+    locationErrorCount: toFiniteNumber(obj.locationErrorCount),
+    timeErrorCount: toFiniteNumber(obj.timeErrorCount),
+
+    clonedCount: toFiniteNumber(obj.clonedCount),
+    redundantCount: toFiniteNumber(obj.redundantCount),
+    unregisteredCount: toFiniteNumber(obj.unregisteredCount),
     integrityErrorCount: toFiniteNumber(obj.integrityErrorCount),
   };
 };
 
 export default function HeaderUploadWidget() {
+  const router = useRouter();
+
+  const [dashboardReloadTrigger, setDashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
+  const searchParams = useSearchParams();
+
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [percent, setPercent] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -89,16 +111,37 @@ export default function HeaderUploadWidget() {
     if (completeAlertedRef.current) return;
     const errorCount = toFiniteNumber(summary.errorCount);
     const cautionCount = toFiniteNumber(summary.cautionCount);
+
+    // 이 2개는 errorCount에 포함됨
+    const locationErrorCount = toFiniteNumber(summary.locationErrorCount);
+    const timeErrorCount = toFiniteNumber(summary.timeErrorCount);
+
+    const clonedCount = toFiniteNumber(summary.clonedCount);
+    const redundantCount = toFiniteNumber(summary.redundantCount);
+    const unregisteredCount = toFiniteNumber(summary.unregisteredCount);
     const integrityErrorCount = toFiniteNumber(summary.integrityErrorCount);
-    const totalIssueCount = errorCount + cautionCount + integrityErrorCount;
-    if (totalIssueCount <= 0) return;
+
+    const totalIssueCount = errorCount + cautionCount + clonedCount + redundantCount + unregisteredCount + integrityErrorCount;
+    if (totalIssueCount <= 0) return false;
 
     completeAlertedRef.current = true;
     const lines: string[] = [`총 ${toFiniteNumber(summary.totalProcessed)}건 처리 중 ${totalIssueCount}건의 문제가 발견되었습니다.`];
     if (errorCount > 0) lines.push(`위험: ${errorCount}`);
     if (cautionCount > 0) lines.push(`경고: ${cautionCount}`);
+
+    lines.push("");
+
+    if (locationErrorCount > 0) lines.push(`허용되지 않는 거점 이동: ${locationErrorCount}`);
+    if (timeErrorCount > 0) lines.push(`불가능한 이동 속도: ${timeErrorCount}`);
+
+    if (unregisteredCount > 0) lines.push(`미등록 EPC: ${unregisteredCount}`);
     if (integrityErrorCount > 0) lines.push(`무결성 오류: ${integrityErrorCount}`);
+    if (clonedCount > 0) lines.push(`복제 EPC: ${clonedCount}`);
+    if (redundantCount > 0) lines.push(`중복 EPC: ${redundantCount}`);
+
     alert(lines.join("\n"));
+
+    return true;
   };
 
   const processLine = (jsonString: string) => {
@@ -115,7 +158,7 @@ export default function HeaderUploadWidget() {
     if (typeof data.percent === "number") {
       setPercent(data.percent);
     }
-
+    console.log(data);
     const summaryFromRoot = readCompleteSummary(data);
     const summaryFromMessage =
       typeof data.message === "string"
@@ -125,7 +168,14 @@ export default function HeaderUploadWidget() {
 
     if (data.event === "complete" && summary) {
       addLog(JSON.stringify(summary));
-      handleCompleteAlert(summary);
+      const isError = handleCompleteAlert(summary);
+
+      if (isError) {
+        //const params = new URLSearchParams(searchParams.toString());
+        //router.push(`/dashboard?${params.toString()}`);
+        setDashboardReloadTrigger(prev => prev + 1);
+        //router.refresh();
+      }
     }
 
     if (typeof data.message === "string" && data.message.trim().length > 0) {
@@ -266,11 +316,10 @@ export default function HeaderUploadWidget() {
                 type="button"
                 onClick={handleUpload}
                 disabled={!hasSelectedFile || isProcessing}
-                className={`w-[110px] rounded-md border px-2 py-1 text-[10px] font-bold transition-colors ${
-                  hasSelectedFile
+                className={`w-[110px] rounded-md border px-2 py-1 text-[10px] font-bold transition-colors ${hasSelectedFile
                     ? "border-emerald-500/70 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
                     : "border-gray-700 bg-gray-800/50 text-gray-500"
-                } disabled:cursor-not-allowed disabled:opacity-50`}
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {isProcessing ? "처리 중..." : "업로드 및 분석 시작"}
               </button>
@@ -278,9 +327,8 @@ export default function HeaderUploadWidget() {
               <button
                 type="button"
                 onClick={() => setIsLogModalOpen(true)}
-                className={`w-[110px] rounded-md border border-red-500/70 bg-red-500/20 px-2 py-1 text-[10px] font-bold text-red-200 hover:bg-red -500/30 ${
-                  canOpenLogModal ? "" : "invisible pointer-events-none"
-                }`}
+                className={`w-[110px] rounded-md border border-red-500/70 bg-red-500/20 px-2 py-1 text-[10px] font-bold text-red-200 hover:bg-red -500/30 ${canOpenLogModal ? "" : "invisible pointer-events-none"
+                  }`}
               >
                 로그 자세히 보기
               </button>
