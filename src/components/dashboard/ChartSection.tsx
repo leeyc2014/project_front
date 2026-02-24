@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { RiskItem } from '@/types/dashboard';
 import { EVENT_TYPE_LABELS } from '@/constants/eventType';
@@ -338,6 +338,13 @@ export function EpcTimelineModal({
   onClearEpcFilter,
   isEpcFilterApplied = false,
 }: TimelineModalProps) {
+  const [pulseOn, setPulseOn] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => setPulseOn((prev) => !prev), 550);
+    return () => window.clearInterval(id);
+  }, [open]);
+
   const serialLabel = useMemo(() => {
     const first = events.find((event) => event != null);
     if (!first) return serial || '-';
@@ -380,6 +387,24 @@ export function EpcTimelineModal({
       y: eventTypes.indexOf(getEventType(event)),
       meta: event,
     }));
+    const markerColorByEvent = (event: RiskItem) => {
+      const hasRule = Boolean((event?.ruleCheck || '').trim());
+      const hasAi = Boolean((event?.aiCheck || '').trim());
+      if (hasRule) return '#ef4444';
+      if (hasAi) return '#facc15';
+      return '#0cd864';
+    };
+    const discreteMarkers = sorted.map((event, index) => {
+      const color = markerColorByEvent(event);
+      const isEmphasis = color === '#ef4444' || color === '#facc15';
+      return {
+        seriesIndex: 0,
+        dataPointIndex: index,
+        fillColor: color,
+        strokeColor: color,
+        size: isEmphasis ? (pulseOn ? 11 : 7) : 8,
+      };
+    });
 
     return {
       series: [
@@ -394,15 +419,15 @@ export function EpcTimelineModal({
           type: 'datetime',
           min: xAxisMin,
           max: xAxisMax,
-          labels: { style: { fontSize: '10px', fontWeight: 600 } },
+          labels: { style: { fontSize: '12px', fontWeight: 600 } },
         },
         yaxis: {
           labels: {
             formatter: (value: number) => getTimelineLabel(value),
-            style: { fontSize: '10px', fontWeight: 600 },
+            style: { fontSize: '12px', fontWeight: 600 },
             offsetX: -15,
             minWidth: 64,
-            maxWidth: 76,
+            maxWidth: 96,
           },
           min: 0,
           max: Math.max(0, eventTypes.length - 1),
@@ -414,8 +439,13 @@ export function EpcTimelineModal({
           borderColor: '#1f2937',
           padding: { left: -8, right: 8 },
         },
-        stroke: { width: 2, curve: 'straight' },
-        markers: { size: 4, colors: ['#fbbf24'] },
+        stroke: { width: 4, curve: 'straight' },
+        markers: {
+          size: 7,
+          strokeWidth: 2,
+          strokeColors: '#0f172a',
+          discrete: discreteMarkers,
+        },
         tooltip: {
           theme: 'dark',
           custom: ({ seriesIndex, dataPointIndex, w }: any) => {
@@ -433,17 +463,17 @@ export function EpcTimelineModal({
         },
       },
     };
-  }, [events]);
+  }, [events, pulseOn]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed right-[450px] top-24 z-40 w-[240px] max-w-[85vw] scale-150 origin-top-right">
+    <div className="fixed right-[450px] top-24 z-40 w-[360px] max-w-[85vw]">
       <div className="rounded-2xl border border-gray-700 bg-gray-900/95 p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <div className="text-xs font-black text-white uppercase tracking-widest">Event Timeline</div>
-            <div className="text-xs font-bold text-white">{serialLabel}</div>
+            <div className="text-m font-black text-white uppercase tracking-widest">Event Timeline</div>
+            <div className="text-sm font-bold text-white">{serialLabel}</div>
           </div>
           <button
             type="button"
@@ -453,7 +483,7 @@ export function EpcTimelineModal({
             Close
           </button>
         </div>
-        <div className="h-[260px]">
+        <div className="h-[390px]">
           {events.length === 0 ? (
             <div className="h-full flex items-center justify-center text-xs font-bold text-white">
               No timeline data

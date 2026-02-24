@@ -379,7 +379,17 @@ export default function LogisticsMap({
       return toSafeCount(route.count);
     };
     const SAFE_NODE_COLOR: [number, number, number, number] = [14, 165, 233, 230];
-    const upsertNode = (key: string, position: [number, number], label: string, route: RouteData) => {
+    const ensureNode = (key: string, position: [number, number], label: string) => {
+      if (nodeMap.has(key)) return;
+      nodeMap.set(key, {
+        position,
+        label,
+        color: SAFE_NODE_COLOR,
+        severity: 0,
+        score: 0,
+      });
+    };
+    const upsertTargetNode = (key: string, position: [number, number], label: string, route: RouteData) => {
       const severity = getRouteSeverity(route);
       const score = getRouteScore(route, severity);
       const color = severity === 0 ? SAFE_NODE_COLOR : getRouteColor(route);
@@ -396,8 +406,9 @@ export default function LogisticsMap({
     cleanedRoutes.forEach((route) => {
       const sourceKey = route.source_info.id;
       const targetKey = route.target_info.id;
-      upsertNode(sourceKey, route.source_info.coords, route.source_info.name, route);
-      upsertNode(targetKey, route.target_info.coords, route.target_info.name, route);
+      ensureNode(sourceKey, route.source_info.coords, route.source_info.name);
+      ensureNode(targetKey, route.target_info.coords, route.target_info.name);
+      upsertTargetNode(targetKey, route.target_info.coords, route.target_info.name, route);
     });
     const nodes = Array.from(nodeMap.values());
     return [
