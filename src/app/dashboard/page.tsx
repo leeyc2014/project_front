@@ -647,7 +647,7 @@ export default function DashboardPage() {
               }`}
             />
           </span>
-          <span className="text-[10px] font-black tracking-wider text-gray-300">
+          <span className="text-[10px] font-black tracking-wider text-gray-300 w-6 text-center">
             {isPatternAnimationEnabled ? 'ON' : 'OFF'}
           </span>
         </button>

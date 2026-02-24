@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Map as MapLibreMap, LngLatBounds } from 'maplibre-gl';
+import { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { ArcLayer, ScatterplotLayer } from '@deck.gl/layers';
@@ -75,7 +75,6 @@ class PatternArcLayer<DataT = unknown> extends ArcLayer<
 export default function LogisticsMap({
   epcFilter,
   routes,
-  trackingPath,
   resetToken,
   viewportPadding,
   onRouteStatusSelect,
@@ -85,10 +84,8 @@ export default function LogisticsMap({
   const mapContainerIdRef = useRef(`logistics-map-${Math.random().toString(36).slice(2, 11)}`);
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
-  const trackingFrameRef = useRef<number | null>(null);
   
   const [mapReady, setMapReady] = useState(false);
-  const [trackingTime, setTrackingTime] = useState<number | null>(null);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
   const [patternPhase, setPatternPhase] = useState(0);
@@ -273,29 +270,6 @@ export default function LogisticsMap({
     };
   }, [mapReady]);
 
-  // --- 카메라 위치 조정 (경로를 위쪽으로 배치) ---
-  useEffect(() => {
-    if (!mapReady || !mapRef.current || !trackingPath || trackingPath.length < 2 || trackingTime === null) return;
-
-    const bounds = new LngLatBounds();
-    const cleaned = trackingPath.filter((p) => isValidCoords(p.coords));
-    if (cleaned.length < 2) return;
-    const unique = new Set(cleaned.map((p) => `${p.coords[0]}|${p.coords[1]}`));
-    if (unique.size < 2) return;
-    cleaned.forEach(p => bounds.extend(p.coords));
-
-    mapRef.current.fitBounds(bounds, {
-      /**
-       * [수정 핵심] bottom 패딩을 크게 주면 경로가 화면의 위쪽(상단)으로 올라갑니다.
-       * top은 최소한의 여백만 남겨서 호(Arc)가 잘리지 않게 합니다.
-       */
-      padding: viewportPadding ?? { top: 80, bottom: 350, left: 100, right: 100 },
-      duration: 2500,
-      pitch: 45, 
-      essential: true
-    });
-  }, [mapReady, trackingPath, trackingTime, viewportPadding]);
-
   useEffect(() => {
     if (!mapReady || !mapRef.current || resetToken == null || resetToken === 0) return;
     mapRef.current.flyTo({
@@ -308,144 +282,8 @@ export default function LogisticsMap({
     });
   }, [mapReady, filteredRoutes, resetToken, viewportPadding]);
 
-  // --- Animation (single pass) ---
-  useEffect(() => {
-    if (!trackingPath || trackingPath.length < 2) {
-      setTrackingTime(null);
-      if (trackingFrameRef.current) cancelAnimationFrame(trackingFrameRef.current);
-      return;
-    }
-
-    const sorted = [...trackingPath].filter((p) => isValidCoords(p.coords)).sort((a, b) => a.t - b.t);
-    if (sorted.length < 2) {
-      setTrackingTime(null);
-      if (trackingFrameRef.current) cancelAnimationFrame(trackingFrameRef.current);
-      return;
-    }
-    const unique = new Set(sorted.map((p) => `${p.coords[0]}|${p.coords[1]}`));
-    if (unique.size < 2) {
-      setTrackingTime(null);
-      if (trackingFrameRef.current) cancelAnimationFrame(trackingFrameRef.current);
-      return;
-    }
-    const startTime = sorted[0].t;
-    const endTime = sorted[sorted.length - 1].t;
-    const totalDuration = 10000;
-    const startPerf = performance.now();
-
-    const tick = (now: number) => {
-      const elapsed = now - startPerf;
-      const progress = Math.min(elapsed / totalDuration, 1);
-      setTrackingTime(startTime + (endTime - startTime) * progress);
-      if (progress < 1) {
-        trackingFrameRef.current = requestAnimationFrame(tick);
-      } else {
-        trackingFrameRef.current = null;
-      }
-    };
-
-    setTrackingTime(startTime);
-    trackingFrameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (trackingFrameRef.current) cancelAnimationFrame(trackingFrameRef.current);
-    };
-  }, [trackingPath]);
-
   const layers = useMemo(() => {
     if (!mapReady) return [];
-
-    if (trackingPath && trackingPath.length >= 2 && trackingTime !== null) {
-      const sorted = [...trackingPath].filter((p) => isValidCoords(p.coords)).sort((a, b) => a.t - b.t);
-      if (sorted.length < 2) return [];
-      const unique = new Set(sorted.map((p) => `${p.coords[0]}|${p.coords[1]}`));
-      if (unique.size < 2) {
-        return [
-          new ScatterplotLayer({
-            id: 'tracking-points',
-            data: sorted.map((p) => ({ position: p.coords, label: p.label })),
-            getPosition: d => d.position,
-            getFillColor: [0, 200, 255],
-            getRadius: 6,
-            radiusUnits: 'pixels',
-            stroked: true,
-            getLineColor: [0, 80, 255],
-            getLineWidth: 1,
-            pickable: true,
-          }),
-        ];
-      }
-      const nextIndex = sorted.findIndex(p => p.t > trackingTime);
-      
-      const completedSegments: any[] = [];
-      let headPos: [number, number] = sorted[sorted.length - 1].coords;
-      let activeSegment = null;
-
-      const limit = nextIndex === -1 ? sorted.length - 1 : nextIndex - 1;
-      for (let i = 0; i < limit; i++) {
-        completedSegments.push({ source: sorted[i].coords, target: sorted[i + 1].coords });
-      }
-
-      if (nextIndex > 0) {
-        const prev = sorted[nextIndex - 1];
-        const next = sorted[nextIndex];
-        const denom = next.t - prev.t;
-        const ratio = denom === 0 ? 0 : (trackingTime - prev.t) / denom;
-        headPos = [
-          prev.coords[0] + (next.coords[0] - prev.coords[0]) * ratio,
-          prev.coords[1] + (next.coords[1] - prev.coords[1]) * ratio
-        ];
-        activeSegment = { source: prev.coords, target: headPos };
-      }
-
-      return [
-        new ScatterplotLayer({
-          id: 'tracking-points',
-          data: sorted.map((p) => ({ position: p.coords, label: p.label })),
-          getPosition: d => d.position,
-          getFillColor: [0, 200, 255],
-          getRadius: 6,
-          radiusUnits: 'pixels',
-          stroked: true,
-          getLineColor: [0, 80, 255],
-          getLineWidth: 1,
-          pickable: true,
-        }),
-        new ArcLayer({
-          id: 'tracking-arc-bg',
-          data: completedSegments,
-          getSourcePosition: d => d.source,
-          getTargetPosition: d => d.target,
-          getSourceColor: [0, 150, 255],
-          getTargetColor: [0, 80, 255],
-          getWidth: 4,
-          getHeight: 0.4,
-          opacity: 0.25
-        }),
-        ...(activeSegment ? [
-          new ArcLayer({
-            id: 'tracking-arc-active',
-            data: [activeSegment],
-            getSourcePosition: d => d.source,
-            getTargetPosition: d => d.target,
-            getSourceColor: [0, 150, 255],
-            getTargetColor: [255, 255, 255],
-            getWidth: 6,
-            getHeight: 0.4,
-          })
-        ] : []),
-        new ScatterplotLayer({
-          id: 'head-point',
-          data: [{ position: headPos }],
-          getPosition: d => d.position,
-          getFillColor: [255, 255, 255],
-          getRadius: 10,
-          radiusUnits: 'pixels',
-          stroked: true,
-          getLineColor: [0, 150, 255],
-          getLineWidth: 2,
-        })
-      ];
-    }
 
     const cleanedRoutes = filteredRoutes.filter(
       (d) => isValidCoords(d?.source_info?.coords) && isValidCoords(d?.target_info?.coords)
@@ -519,16 +357,47 @@ export default function LogisticsMap({
       }
     });
 
-    const nodeMap = new globalThis.Map<string, { position: [number, number]; label: string }>();
+    type NodeVisualData = {
+      position: [number, number];
+      label: string;
+      color: [number, number, number, number];
+      severity: 0 | 1 | 2;
+      score: number;
+    };
+    const nodeMap = new globalThis.Map<string, NodeVisualData>();
+    const toSafeCount = (value: unknown) => Math.max(0, Number(value ?? 0) || 0);
+    const getRouteSeverity = (route: RouteData): 0 | 1 | 2 => {
+      const errorCount = toSafeCount(route.errorCount);
+      const cautionCount = toSafeCount(route.cautionCount);
+      if (errorCount > 0) return 2;
+      if (cautionCount > 0) return 1;
+      return 0;
+    };
+    const getRouteScore = (route: RouteData, severity: 0 | 1 | 2): number => {
+      if (severity === 2) return toSafeCount(route.errorCount);
+      if (severity === 1) return toSafeCount(route.cautionCount);
+      return toSafeCount(route.count);
+    };
+    const SAFE_NODE_COLOR: [number, number, number, number] = [14, 165, 233, 230];
+    const upsertNode = (key: string, position: [number, number], label: string, route: RouteData) => {
+      const severity = getRouteSeverity(route);
+      const score = getRouteScore(route, severity);
+      const color = severity === 0 ? SAFE_NODE_COLOR : getRouteColor(route);
+      const existing = nodeMap.get(key);
+      if (!existing) {
+        nodeMap.set(key, { position, label, color, severity, score });
+        return;
+      }
+
+      if (severity > existing.severity || (severity === existing.severity && score > existing.score)) {
+        nodeMap.set(key, { ...existing, color, severity, score });
+      }
+    };
     cleanedRoutes.forEach((route) => {
       const sourceKey = `${route.source_info.id}:${route.source_info.coords[0]}:${route.source_info.coords[1]}`;
       const targetKey = `${route.target_info.id}:${route.target_info.coords[0]}:${route.target_info.coords[1]}`;
-      if (!nodeMap.has(sourceKey)) {
-        nodeMap.set(sourceKey, { position: route.source_info.coords, label: route.source_info.name });
-      }
-      if (!nodeMap.has(targetKey)) {
-        nodeMap.set(targetKey, { position: route.target_info.coords, label: route.target_info.name });
-      }
+      upsertNode(sourceKey, route.source_info.coords, route.source_info.name, route);
+      upsertNode(targetKey, route.target_info.coords, route.target_info.name, route);
     });
     const nodes = Array.from(nodeMap.values());
     return [
@@ -590,17 +459,17 @@ export default function LogisticsMap({
       new ScatterplotLayer({
         id: 'global-route-nodes',
         data: nodes,
-        getPosition: (d: { position: [number, number] }) => d.position,
-        getFillColor: [14, 165, 233, 230],
-        getRadius: 5,
+        getPosition: (d: NodeVisualData) => d.position,
+        getFillColor: (d: NodeVisualData) => d.color,
+        getRadius: 6,
         radiusUnits: 'pixels',
         stroked: true,
-        getLineColor: [224, 242, 254, 220],
+        getLineColor: (d: NodeVisualData) => d.color,
         getLineWidth: 1,
         pickable: true,
       }),
     ];
-  }, [mapReady, filteredRoutes, trackingPath, trackingTime, routeCountScale, onRouteStatusSelect, patternPhase, patternAnimationEnabled]);
+  }, [mapReady, filteredRoutes, routeCountScale, onRouteStatusSelect, patternPhase, patternAnimationEnabled]);
 
   useEffect(() => {
     if (overlayRef.current) overlayRef.current.setProps({ layers });
