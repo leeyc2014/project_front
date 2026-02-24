@@ -33,6 +33,7 @@ function PrintReportContent() {
   const [stepStats, setStepStats] = useState<any[]>([]);
   const [dangerList, setDangerList] = useState<any[]>([]);
   const [cautionList, setCautionList] = useState<any[]>([]);
+  const [errorList, setErrorList] = useState<any[]>([]);
 
   const [productName, setProductName] = useState<string>("전체");
 
@@ -54,15 +55,17 @@ function PrintReportContent() {
         const authHeaders = { Authorization: `Bearer ${token}` };
 
         // 3개 API 병렬 호출
-        const [initRes, chartRes, listRes] = await Promise.all([
+        const [initRes, chartRes, listRes, logisErrorRes] = await Promise.all([
           fetch(`${backendBaseUrl}/api/v1/dashboard/init-data`, { headers: authHeaders }),
           fetch(`${backendBaseUrl}/api/v1/dashboard/chart?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}`, { headers: authHeaders }),
-          fetch(`${backendBaseUrl}/api/v1/logis-move/totallist?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}&size=999999`, { headers: authHeaders })
+          fetch(`${backendBaseUrl}/api/v1/logis-move/totallist?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}&size=999999`, { headers: authHeaders }),
+          fetch(`${backendBaseUrl}/api/v1/logis-error?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}&size=999999`, { headers: authHeaders }),
         ]);
 
         const initData = await initRes.json();
         const chartData = await chartRes.json();
         const listData = await listRes.json();
+        const logisErrorData = await logisErrorRes.json();
 
         if (productId) {
           const productList = initData.filters?.productList || [];
@@ -80,6 +83,7 @@ function PrintReportContent() {
           else if (item.checkResult === "CAUTION") caution++;
           else if (item.checkResult === "DANGER") danger++;
         });
+        
         setSummary({ total: contents.length, safe, caution, danger });
 
         // 2. 유형별 진단 (2 API - kpi)
@@ -128,6 +132,26 @@ function PrintReportContent() {
         setDangerList(dList);
         setCautionList(cList);
 
+        const productList = initData.filters?.productList;
+        const locationList = initData.locationList;
+        
+        logisErrorData.forEach((item:any)=>{
+          const epcCodeSpl = item.epcCode.split(".").map((t:string)=>Number(t));
+
+          item.epcHeader = epcCodeSpl[0];
+          item.epcCompany = epcCodeSpl[1];
+          item.epcProduct = epcCodeSpl[2];
+          item.epcLot = epcCodeSpl[3];
+          item.epcManufacture = epcCodeSpl[4];
+          item.epcSerial = epcCodeSpl[5];
+
+          item.productName = productList.find((p: any) => p.id === item.epcProduct)?.label;
+
+          item.locationName = locationList.find((l:any)=>l.locationId === 4)?.locationName;
+
+        })
+        setErrorList(logisErrorData);
+
       } catch (error) {
         console.error("데이터 로딩 중 오류 발생:", error);
       } finally {
@@ -148,16 +172,16 @@ function PrintReportContent() {
     return isoString.replace("T", " "); // 간단히 T만 공백으로 치환
   };
 
-  const renderDetails = (item: any, type: "DANGER" | "CAUTION") => {
-    const firstDetail = item.details && item.details[0] ? item.details[0] : {};
+  const renderDetails = (item: any, type: "DANGER" | "CAUTION" | "ERROR") => {
+    const firstDetail = type === "ERROR" ? item : item.details && item.details[0] ? item.details[0] : {};
 
     return (
       <div key={item.epcCode} className="mb-4 last:mb-0">
         <p className="font-bold">
-          {item.productName} (LOT: {firstDetail.epcLot}, SERIAL: {firstDetail.epcSerial}) - EPC: {item.epcCode}
+          {item.productName} (LOT: {firstDetail.epcLot}, SERIAL: {firstDetail.epcSerial}) <span className="text-xs font-normal">- EPC: {item.epcCode}</span>
         </p>
         <ul className="list-disc pl-5 mt-1 text-gray-700">
-          {item.details.map((detail: any, idx: number) => {
+          {(type === "ERROR" ? [item] : item.details).map((detail: any, idx: number) => {
             if (type === "DANGER" && detail.ruleCheck) {
               return (
                 <li key={idx}>
@@ -170,6 +194,12 @@ function PrintReportContent() {
                   <span className="font-semibold text-orange-600">주의</span> : {detail.locationName} / {EVENT_TYPE_LABELS[detail.eventType] || detail.eventType} / {formatDateTime(detail.eventTime)} / 사유: {convertMessage(detail.aiCheck)} ({detail.aiCheck})
                 </li>
               );
+            } else if(type === "ERROR") {
+              return (
+                <li key={idx}>
+                  <span className="font-semibold text-red-600">오류</span> : {detail.locationName} / {formatDateTime(detail.eventTime)} / 사유 : {STATUS_LABELS[detail.status] || detail.status}
+                </li>
+              )
             }
             return null;
           })}
@@ -207,9 +237,9 @@ function PrintReportContent() {
 
         {/* 문서 헤더 */}
         <div className="text-center mb-10 mt-4">
-          <h1 className="text-3xl font-bold mb-6">물류 진단 리포트</h1>
+          <h1 className="text-4xl font-bold mb-6">물류 진단 리포트</h1>
 
-          <div className="flex justify-end text-sm">
+          <div className="flex justify-end">
             <table className="text-right">
               <tbody>
                 <tr>
@@ -227,38 +257,21 @@ function PrintReportContent() {
 
         <div className="space-y-8">
 
-          {/* 종합 요약 */}
+
           <section>
-            <h2 className="text-lg font-bold mb-2">종합 요약</h2>
-            <table className="w-full border-collapse border border-black text-sm text-center">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="border border-black p-2 font-bold w-1/4">안전</th>
-                  <th className="border border-black p-2 font-bold w-1/4">주의</th>
-                  <th className="border border-black p-2 font-bold w-1/4">위험</th>
-                  <th className="border border-black p-2 font-bold w-1/4">합계</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-black p-2">{summary.safe.toLocaleString()}</td>
-                  <td className="border border-black p-2">{summary.caution.toLocaleString()}</td>
-                  <td className="border border-black p-2">{summary.danger.toLocaleString()}</td>
-                  <td className="border border-black p-2 font-bold">{summary.total.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
+            <h2 className="text-2xl font-bold">위험 물류 요약</h2>
           </section>
 
           {/* 유형별 진단 */}
           <section>
-            <h2 className="text-lg font-bold mb-2 text-red-700">유형별 진단 (위험)</h2>
+            <h2 className="text-lg font-bold mb-2">:: 유형별 진단 ::</h2>
             <table className="w-full border-collapse border border-black text-sm">
               <thead className="bg-gray-50 text-center">
                 <tr>
+                  <th className="border border-black p-2 font-bold w-16">분류</th>
                   <th className="border border-black p-2 font-bold">진단 항목</th>
                   <th className="border border-black p-2 font-bold w-32">발생 건수</th>
-                  <th className="border border-black p-2 font-bold w-32">비율 (%)</th>
+                  <th className="border border-black p-2 font-bold w-32">전체 물류 비율 (%)</th>
                 </tr>
               </thead>
               <tbody>
@@ -272,6 +285,9 @@ function PrintReportContent() {
 
                   return (
                     <tr key={idx}>
+                      {(idx === 0 || idx === 4) &&<td className="border border-black p-2 text-center" rowSpan={idx === 0 ? 4 : 2}>
+                          {idx === 0 ? (<span>데이터<br/>정합성<br/>오류</span>) : (<span>이상<br/>데이터</span>)}
+                        </td>}
                       <td className="border border-black p-2">{STATUS_LABELS[statusKey]}</td>
                       <td className="border border-black p-2 text-right">{count.toLocaleString()}</td>
                       <td className="border border-black p-2 text-right">{ratio}%</td>
@@ -279,13 +295,41 @@ function PrintReportContent() {
                   );
                 })}
                 <tr className="bg-gray-50 font-bold">
-                  <td className="border border-black p-2 text-center">합계</td>
+                  <td className="border border-black p-2 text-center" colSpan={2}>합계</td>
                   <td className="border border-black p-2 text-right">
                     {kpiList.reduce((acc, curr) => acc + curr.count, 0).toLocaleString()}
                   </td>
                   <td className="border border-black p-2 text-right">
-                    {kpiList.reduce((acc, curr) => acc + curr.ratio, 0).toFixed(2)}%
+                    {Math.min(100, kpiList.reduce((acc, curr) => acc + curr.ratio, 0)).toFixed(2)}%
                   </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section className="pt-4">
+            <span className="text-2xl font-bold">물류 데이터 통계</span>
+            <span className="ml-3 text-end text-sm text-gray-600">※ 데이터 정합성 오류는 포함하지 않습니다.</span>           
+          </section>
+
+          {/* 종합 요약 */}
+          <section>
+            <h2 className="text-lg font-bold mb-2">:: 물류 종합 요약 ::</h2>
+            <table className="w-full border-collapse border border-black text-sm text-center">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="border border-black p-2 font-bold w-1/4">안전</th>
+                  <th className="border border-black p-2 font-bold w-1/4">주의</th>
+                  <th className="border border-black p-2 font-bold w-1/4">위험</th>
+                  <th className="border border-black p-2 font-bold w-1/4">합계</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-black p-2">{summary.safe.toLocaleString()}</td>
+                  <td className={`border border-black p-2 ${summary.caution > 0 ? 'text-orange-600 font-bold' : ''}`}>{summary.caution.toLocaleString()}</td>
+                  <td className={`border border-black p-2 ${summary.danger > 0 ? 'text-red-700 font-bold' : ''}`}>{summary.danger.toLocaleString()}</td>
+                  <td className="border border-black p-2 font-bold">{summary.total.toLocaleString()}</td>
                 </tr>
               </tbody>
             </table>
@@ -293,7 +337,7 @@ function PrintReportContent() {
 
           {/* 허브별 진단 */}
           <section>
-            <h2 className="text-lg font-bold mb-2">허브별 진단</h2>
+            <h2 className="text-lg font-bold mb-2">:: 허브별 진단 ::</h2>
             <table className="w-full border-collapse border border-black text-sm text-center">
               <thead className="bg-gray-50">
                 <tr>
@@ -309,8 +353,8 @@ function PrintReportContent() {
                   <tr key={idx}>
                     <td className="border border-black p-2 text-left">{hub.name}</td>
                     <td className="border border-black p-2">{hub.safe.toLocaleString()}</td>
-                    <td className="border border-black p-2">{hub.caution.toLocaleString()}</td>
-                    <td className="border border-black p-2">{hub.danger.toLocaleString()}</td>
+                    <td className={`border border-black p-2 ${hub.caution > 0 ? 'text-orange-600 font-bold' : ''}`}>{hub.caution.toLocaleString()}</td>
+                    <td className={`border border-black p-2 ${hub.danger > 0 ? 'text-red-700 font-bold' : ''}`}>{hub.danger.toLocaleString()}</td>
                     <td className="border border-black p-2">{hub.total.toLocaleString()}</td>
                   </tr>
                 ))}
@@ -320,7 +364,7 @@ function PrintReportContent() {
 
           {/* 스텝별 진단 */}
           <section>
-            <h2 className="text-lg font-bold mb-2">스텝별 진단</h2>
+            <h2 className="text-lg font-bold mb-2">:: 스텝별 진단 ::</h2>
             <table className="w-full border-collapse border border-black text-sm text-center">
               <thead className="bg-gray-50">
                 <tr>
@@ -336,8 +380,8 @@ function PrintReportContent() {
                   <tr key={idx}>
                     <td className="border border-black p-2 text-left">{step.name}</td>
                     <td className="border border-black p-2">{step.safe.toLocaleString()}</td>
-                    <td className="border border-black p-2">{step.caution.toLocaleString()}</td>
-                    <td className="border border-black p-2">{step.danger.toLocaleString()}</td>
+                    <td className={`border border-black p-2 ${step.caution > 0 ? 'text-orange-600 font-bold' : ''}`}>{step.caution.toLocaleString()}</td>
+                    <td className={`border border-black p-2 ${step.danger > 0 ? 'text-red-700 font-bold' : ''}`}>{step.danger.toLocaleString()}</td>
                     <td className="border border-black p-2">{step.total.toLocaleString()}</td>
                   </tr>
                 ))}
@@ -347,13 +391,30 @@ function PrintReportContent() {
 
           {/* 조건부 렌더링 영역: 상세 목록 (인쇄 및 화면 표시 토글) */}
           {showDetails && (
-            <div className="space-y-8 print:break-before-page mt-8">
+            <div className="space-y-8 mt-8">
+                  
+              <section className="pt-4 print:break-before-page">
+                <span className="text-2xl font-bold">물류 상세 목록</span>
+              </section>
+              
               {/* 진단 물류 목록 (위험) */}
               <section>
-                <h2 className="text-lg font-bold mb-2 text-red-700">진단 물류 목록 (위험)</h2>
-                <div className="min-h-[100px] border border-black p-4 text-sm whitespace-pre-wrap">
+                <h2 className="text-lg font-bold mb-2 text-red-700">:: 데이터 정합성 오류 ::</h2>
+                <div className="min-h-25 border border-black p-4 text-sm whitespace-pre-wrap">
+                  {errorList.length === 0 ? (
+                    <span className="text-gray-500">데이터 정합성 오류 물류가 없습니다.</span>
+                  ) : (
+                    errorList.map(item => renderDetails(item, "ERROR"))
+                  )}
+                </div>
+              </section>
+
+              {/* 진단 물류 목록 (위험) */}
+              <section>
+                <h2 className="text-lg font-bold mb-2 text-red-700">:: 위험 이상 데이터 ::</h2>
+                <div className="min-h-25 border border-black p-4 text-sm whitespace-pre-wrap">
                   {dangerList.length === 0 ? (
-                    <span className="text-gray-500">위험 진단 물류가 없습니다.</span>
+                    <span className="text-gray-500">위험 물류가 없습니다.</span>
                   ) : (
                     dangerList.map(item => renderDetails(item, "DANGER"))
                   )}
@@ -362,10 +423,10 @@ function PrintReportContent() {
 
               {/* 진단 물류 목록 (주의) */}
               <section>
-                <h2 className="text-lg font-bold mb-2 text-orange-600">진단 물류 목록 (주의)</h2>
-                <div className="min-h-[100px] border border-black p-4 text-sm whitespace-pre-wrap">
+                <h2 className="text-lg font-bold mb-2 text-orange-600">:: 주의 이상 데이터 ::</h2>
+                <div className="min-h-25 border border-black p-4 text-sm whitespace-pre-wrap">
                   {cautionList.length === 0 ? (
-                    <span className="text-gray-500">주의 진단 물류가 없습니다.</span>
+                    <span className="text-gray-500">주의 물류가 없습니다.</span>
                   ) : (
                     cautionList.map(item => renderDetails(item, "CAUTION"))
                   )}
