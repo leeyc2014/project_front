@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { loginUserAtom } from '@/atoms/atom';
 import { User } from '@/types/user';
@@ -60,14 +60,17 @@ export default function Page() {
                 body: JSON.stringify(credentials),
             });
 
-            // 응답이 JSON 형식이 아닐 경우를 대비한 처리
-            if (!response.ok && response.status !== 401) {
-                throw new Error("서버 응답 오류");
+            let result: any = {};
+            const rawText = await response.text();
+            if (rawText) {
+                try {
+                    result = JSON.parse(rawText);
+                } catch {
+                    result = {};
+                }
             }
 
-            const result = await response.json(); // 백엔드의 LoginResponse DTO
-
-            if (response.ok && result.success) {
+            if (response.ok && result?.success) {
                 // 로그인 성공 시 로직
                 //alert(`로그인 성공! ${result.message}`);
                 
@@ -88,8 +91,8 @@ export default function Page() {
                 // 대시보드로 이동
                 router.push(`/dashboard?${defaultDashboardQuery}`);
             } else {
-                // 백엔드에서 보낸 실패 메시지 출력 (비번 틀림 등)
-                alert(result.message || "로그인에 실패했습니다. 정보를 확인하세요.");
+                // DB 조회 후 로그인 불가(없는 아이디/비활성화 포함) 케이스
+                alert("로그인에 실패했습니다.");
             }
         } catch (error) {
             console.error("로그인 통신 실패:", error);
@@ -165,4 +168,4 @@ export default function Page() {
             </div>
         </main>
     );
-}
+  }

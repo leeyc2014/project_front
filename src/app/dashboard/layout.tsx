@@ -44,6 +44,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       "name": "보고서 목록",
       "admin_only": true
     },
+    {
+      "key": "members",
+      "url": "/dashboard/members",
+      "name": "회원 관리",
+      "admin_only": true
+    },
 
   ]
 
@@ -63,7 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!hasAuthToken()) {
       setIsAuthorized(false);
-      alert('\uB85C\uADF8\uC778 \uC774\uD6C4 \uC0AC\uC6A9 \uAC00\uB2A5\uD569\uB2C8\uB2E4.');
+      alert('로그인 이후 사용 가능합니다.');
       router.replace('/');
       return;
     }
@@ -75,6 +81,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setSelectedMenu("report");
     } else if (pathname.includes("/dashboard/anomaly")) {
       setSelectedMenu("anomaly");
+    } else if (pathname.includes("/dashboard/members")) {
+      setSelectedMenu("members");
     } else {
       setSelectedMenu("dashboard");
     }
