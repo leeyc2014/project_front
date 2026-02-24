@@ -217,7 +217,6 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    console.log('fetch charts!!!');
     if (!backendBaseUrl) {
       setIsChartLoading(false);
       return;

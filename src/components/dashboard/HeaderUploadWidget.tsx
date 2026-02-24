@@ -158,7 +158,7 @@ export default function HeaderUploadWidget() {
     if (typeof data.percent === "number") {
       setPercent(data.percent);
     }
-    console.log(data);
+    
     const summaryFromRoot = readCompleteSummary(data);
     const summaryFromMessage =
       typeof data.message === "string"

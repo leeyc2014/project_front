@@ -132,7 +132,6 @@ function PrintReportContent() {
         setDangerList(dList);
         setCautionList(cList);
 
-        console.log(logisErrorData);
         const productList = initData.filters?.productList;
         const locationList = initData.locationList;
         
