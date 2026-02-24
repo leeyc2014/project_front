@@ -9,6 +9,7 @@ import SerialList from '@/components/dashboard/SerialList';
 import FilterPanel from '@/components/dashboard/FilterPanel';
 import ChartSection, { EpcTimelineModal } from '@/components/dashboard/ChartSection';
 import DashboardLoadingOverlay from '@/components/dashboard/DashboardLoadingOverlay';
+import DateRangeQuickPicker from '@/components/dashboard/DateRangeQuickPicker';
 import type { RouteData } from '@/types/logisticsMap';
 import { useAtom } from 'jotai';
 import { dashboardReloadTriggerAtom } from '@/atoms/atom';
@@ -183,8 +184,6 @@ export default function DashboardPage() {
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const bottomChartsRef = useRef<HTMLDivElement>(null);
-  const eventStartInputRef = useRef<HTMLInputElement>(null);
-  const eventEndInputRef = useRef<HTMLInputElement>(null);
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
 
 
@@ -257,7 +256,7 @@ export default function DashboardPage() {
         setIfPresent(query, 'eventTimeEnd', filters.eventTimeEnd || '');
         setIfPresent(query, 'manufactureDate', filters.manufactureDate || '');
         setIfPresent(query, 'expiryDate', filters.expiryDate || '');
-        query.set('_t', dashboardReloadTrigger.toString());
+	query.set('_t', dashboardReloadTrigger.toString());
 
         const queryString = query.toString();
         const url = queryString
@@ -531,15 +530,9 @@ export default function DashboardPage() {
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
 
-  const handleQuickDateFilterChange = useCallback(
-    (key: 'eventTimeStart' | 'eventTimeEnd', value: string) => {
-      const nextFilters = { ...filters, [key]: value };
-      if (key === 'eventTimeStart' && value && nextFilters.eventTimeEnd && value > nextFilters.eventTimeEnd) {
-        nextFilters.eventTimeEnd = value;
-      }
-      if (key === 'eventTimeEnd' && value && nextFilters.eventTimeStart && value < nextFilters.eventTimeStart) {
-        nextFilters.eventTimeStart = value;
-      }
+  const handleQuickDateRangeChange = useCallback(
+    (nextStart: string, nextEnd: string) => {
+      const nextFilters = { ...filters, eventTimeStart: nextStart, eventTimeEnd: nextEnd };
       setFilters(nextFilters);
       setTimelineOpen(false);
 
@@ -551,8 +544,8 @@ export default function DashboardPage() {
           params.delete(paramKey);
         }
       };
-      setOrDelete('eventTimeStart', nextFilters.eventTimeStart || '');
-      setOrDelete('eventTimeEnd', nextFilters.eventTimeEnd || '');
+      setOrDelete('eventTimeStart', nextStart || '');
+      setOrDelete('eventTimeEnd', nextEnd || '');
       params.set('page', '0');
       params.delete('size');
       params.delete('st');
@@ -562,20 +555,6 @@ export default function DashboardPage() {
     },
     [filters, router, searchParams]
   );
-
-  const openDatePicker = useCallback((ref: { current: HTMLInputElement | null }) => {
-    const input = ref.current;
-    if (!input) return;
-
-    const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
-    if (typeof pickerInput.showPicker === 'function') {
-      pickerInput.showPicker();
-      return;
-    }
-
-    input.focus();
-    input.click();
-  }, []);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-gray-100" ref={mapWrapRef}>
@@ -594,45 +573,11 @@ export default function DashboardPage() {
       <div className="absolute top-6 left-20 z-20 pointer-events-none flex flex-col items-start gap-3">
         {/* 시간 필터 박스 + 애니메이션 스위치 */}
         <div className="pointer-events-auto flex items-center gap-3">
-        <div className="bg-gray-900/90 backdrop-blur-md px-6 py-2.5 rounded-full shadow-xl border border-gray-700/70 flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openDatePicker(eventStartInputRef)}
-              className="text-blue-500 hover:text-blue-400 transition-colors"
-              aria-label="Open start date picker"
-            >
-              <CalendarIcon />
-            </button>
-            <input
-              ref={eventStartInputRef}
-              type="date"
-              className="bg-transparent text-xs font-bold text-gray-200 outline-none uppercase tracking-tighter w-[100px] [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:pointer-events-none"
-              value={filters.eventTimeStart}
-              max={filters.eventTimeEnd || undefined}
-              onChange={(e) => handleQuickDateFilterChange('eventTimeStart', e.target.value)}
-            />
-          </div>
-          <div className="h-3 w-[1px] bg-gray-600" />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openDatePicker(eventEndInputRef)}
-              className="text-blue-500 hover:text-blue-400 transition-colors"
-              aria-label="Open end date picker"
-            >
-              <CalendarIcon />
-            </button>
-            <input
-              ref={eventEndInputRef}
-              type="date"
-              className="bg-transparent text-xs font-bold text-gray-200 outline-none uppercase tracking-tighter w-[100px] [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:pointer-events-none"
-              value={filters.eventTimeEnd}
-              min={filters.eventTimeStart || undefined}
-              onChange={(e) => handleQuickDateFilterChange('eventTimeEnd', e.target.value)}
-            />           
-          </div>
-        </div>
+          <DateRangeQuickPicker
+            startDate={filters.eventTimeStart}
+            endDate={filters.eventTimeEnd}
+            onApply={handleQuickDateRangeChange}
+          />
         <button
           type="button"
           role="switch"
@@ -809,15 +754,6 @@ export default function DashboardPage() {
       />
       {isMapPending && <DashboardLoadingOverlay />}
     </div>
-  );
-}
-
-// 아이콘들
-function CalendarIcon() {
-  return (
-    <svg className="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
   );
 }
 

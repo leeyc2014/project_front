@@ -8,7 +8,7 @@ import { ArcLayer, ScatterplotLayer } from '@deck.gl/layers';
 import type { LogisticsMapProps, RouteData } from '@/types/logisticsMap';
 
 const INITIAL_CENTER: [number, number] = [128.1, 35.3];
-const INITIAL_ZOOM = 7.5;
+const INITIAL_ZOOM = 7.8;
 const INITIAL_PITCH = 60;
 const patternUniforms = {
   name: 'pattern',
@@ -394,8 +394,8 @@ export default function LogisticsMap({
       }
     };
     cleanedRoutes.forEach((route) => {
-      const sourceKey = `${route.source_info.id}:${route.source_info.coords[0]}:${route.source_info.coords[1]}`;
-      const targetKey = `${route.target_info.id}:${route.target_info.coords[0]}:${route.target_info.coords[1]}`;
+      const sourceKey = route.source_info.id;
+      const targetKey = route.target_info.id;
       upsertNode(sourceKey, route.source_info.coords, route.source_info.name, route);
       upsertNode(targetKey, route.target_info.coords, route.target_info.name, route);
     });

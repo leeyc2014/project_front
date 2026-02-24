@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_FILTERS, FilterState } from '@/types/dashboard';
+import DateRangeQuickPicker from '@/components/dashboard/DateRangeQuickPicker';
 
 export default function FilterPanel({ isOpen, onClose, filters, setFilters, filterOptions }: any) {
   const [draft, setDraft] = useState<FilterState>(filters as FilterState);
@@ -68,8 +69,8 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
     ...(draft.epcCode ? [{ key: 'epcCode', label: `EPC Code: ${draft.epcCode}`, value: draft.epcCode }] : []),
     ...(draft.epcLot != null ? [{ key: 'epcLot', label: `EPC Lot: ${draft.epcLot}`, value: String(draft.epcLot) }] : []),
     ...(draft.epcSerial != null ? [{ key: 'epcSerial', label: `EPC Serial: ${draft.epcSerial}`, value: String(draft.epcSerial) }] : []),
-    ...(draft.eventTimeStart ? [{ key: 'eventTimeStart', label: `Event Period Start: ${draft.eventTimeStart}`, value: draft.eventTimeStart }] : []),
-    ...(draft.eventTimeEnd ? [{ key: 'eventTimeEnd', label: `Event Period End: ${draft.eventTimeEnd}`, value: draft.eventTimeEnd }] : []),
+    ...(draft.eventTimeStart ? [{ key: 'eventTimeStart', label: `EventTimeStart: ${draft.eventTimeStart}`, value: draft.eventTimeStart }] : []),
+    ...(draft.eventTimeEnd ? [{ key: 'eventTimeEnd', label: `EventTimeEnd: ${draft.eventTimeEnd}`, value: draft.eventTimeEnd }] : []),
     ...(draft.manufactureDate ? [{ key: 'manufactureDate', label: `Manufacture Date: ${draft.manufactureDate}`, value: draft.manufactureDate }] : []),
     ...(draft.expiryDate ? [{ key: 'expiryDate', label: `Expiry Date: ${draft.expiryDate}`, value: draft.expiryDate }] : []),
   ] as { key: keyof FilterState; label: string; value: string }[];
@@ -99,7 +100,13 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setDraft(DEFAULT_FILTERS)}
+              onClick={() =>
+                setDraft({
+                  ...DEFAULT_FILTERS,
+                  eventTimeStart: '2024-07-25',
+                  eventTimeEnd: '2024-07-31',
+                })
+              }
               className="px-3 py-1.5 text-[11px] font-bold rounded-full border border-gray-800 bg-gray-950 text-white hover:text-white hover:border-gray-500"
             >
               Reset
@@ -145,9 +152,18 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             onToggle={() => {}}
           >
             <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DateInput label="Event Period Start" val={draft.eventTimeStart} onChange={(v:string) => setVal('eventTimeStart', v)} />
-                <DateInput label="Event Period End" val={draft.eventTimeEnd} onChange={(v:string) => setVal('eventTimeEnd', v)} />
+              <div className="relative">
+                <label className="block text-[10px] font-black text-white uppercase mb-2">Event Period</label>
+                <DateRangeQuickPicker
+                  startDate={draft.eventTimeStart}
+                  endDate={draft.eventTimeEnd}
+                  layout="vertical"
+                  inline
+                  onApply={(nextStart, nextEnd) => {
+                    setVal('eventTimeStart', nextStart);
+                    setVal('eventTimeEnd', nextEnd);
+                  }}
+                />
               </div>
               <DateInput label="Manufacture Date" val={draft.manufactureDate} onChange={(v:string) => setVal('manufactureDate', v)} />
               <DateInput label="Expiry Date" val={draft.expiryDate} onChange={(v:string) => setVal('expiryDate', v)} />

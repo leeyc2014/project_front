@@ -219,9 +219,12 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
       });
 
       const topHubsByDefect = Object.entries(aggregated)
+        .filter(([, stats]) => stats.error > 0 || stats.caution > 0)
         .sort((a, b) => {
           const errorDiff = b[1].error - a[1].error;
           if (errorDiff !== 0) return errorDiff;
+          const cautionDiff = b[1].caution - a[1].caution;
+          if (cautionDiff !== 0) return cautionDiff;
           return a[0].localeCompare(b[0], undefined, { numeric: true });
         })
         .slice(0, 5);
@@ -397,12 +400,20 @@ export function EpcTimelineModal({
           labels: {
             formatter: (value: number) => getTimelineLabel(value),
             style: { fontSize: '10px', fontWeight: 600 },
+            offsetX: -15,
+            minWidth: 64,
+            maxWidth: 76,
           },
-          tickAmount: Math.max(1, eventTypes.length - 1),
-          min: -0.5,
-          max: Math.max(0, eventTypes.length - 0.5),
+          min: 0,
+          max: Math.max(0, eventTypes.length - 1),
+          tickAmount: eventTypes.length > 1 ? eventTypes.length - 1 : 1,
+          forceNiceScale: false,
+          decimalsInFloat: 0,
         },
-        grid: { borderColor: '#1f2937' },
+        grid: {
+          borderColor: '#1f2937',
+          padding: { left: -8, right: 8 },
+        },
         stroke: { width: 2, curve: 'straight' },
         markers: { size: 4, colors: ['#fbbf24'] },
         tooltip: {
