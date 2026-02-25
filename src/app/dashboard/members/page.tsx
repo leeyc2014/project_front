@@ -240,14 +240,21 @@ export default function MembersPage() {
             <div className="px-6 py-16 text-center text-gray-500 text-sm">등록된 회원이 없습니다.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[32%]" />
+                  <col className="w-[32%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[12%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-900/60">
-                    {["ID", "이름", "권한", "활성화 여부", "수정"].map((h) => (
-                      <th key={h} className="px-4 py-2 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">
-                        {h}
-                      </th>
-                    ))}
+                    <th className="px-4 py-2 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">ID</th>
+                    <th className="px-4 py-2 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">이름</th>
+                    <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">권한</th>
+                    <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">활성화 여부</th>
+                    <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">수정</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700/50">
@@ -255,12 +262,12 @@ export default function MembersPage() {
                     <tr key={member.id} className="hover:bg-gray-700/40 transition-colors">
                       <td className="px-4 py-3 font-mono text-sm text-gray-300">{member.id}</td>
                       <td className="px-4 py-3 text-white font-semibold">{member.name}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-center">
                         <span className="inline-block bg-blue-900/50 text-blue-300 text-[12px] font-bold px-2.5 py-1 rounded-lg border border-blue-700/50">
                           {member.role}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-center">
                         <span
                           className={`inline-block text-[12px] font-bold px-2.5 py-1 rounded-lg border ${
                             member.enabled
@@ -271,7 +278,7 @@ export default function MembersPage() {
                           {enabledLabel(member.enabled)}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => openEdit(member)}
                           className="px-2.5 py-1 bg-gray-700 text-white rounded-lg text-[12px] font-black hover:bg-blue-600 transition-all border border-gray-600"
@@ -400,7 +407,7 @@ export default function MembersPage() {
               </div>
 
               {isEditingMe && (
-                <p className="text-sm text-yellow-300">현재 로그인한 계정은 name/password만 수정할 수 있습니다.</p>
+                <p className="text-sm text-yellow-300">현재 로그인한 계정은 이름/비밀번호만 수정할 수 있습니다.</p>
               )}
             </div>
 
