@@ -8,6 +8,7 @@ type DateRangeQuickPickerProps = {
   onApply: (nextStart: string, nextEnd: string) => void;
   layout?: 'horizontal' | 'vertical';
   inline?: boolean;
+  dropdownPosition?: 'relative' | 'absolute';
 };
 
 // 'start' | 'end' | null 에서, 첫 번째 클릭인지 두 번째 클릭인지 상태를 관리하기 위해 단순화
@@ -57,6 +58,7 @@ export default function DateRangeQuickPicker({
   onApply,
   layout = 'horizontal',
   inline = false,
+  dropdownPosition = 'relative',
 }: DateRangeQuickPickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const initialStart = startDate || '2024-07-25';
@@ -243,7 +245,11 @@ export default function DateRangeQuickPicker({
       </button>
 
       {open && (
-        <div className="relative mt-3 z-50 rounded-2xl border border-gray-700/50 bg-gray-900/95 p-4 shadow-2xl backdrop-blur-xl flex flex-col gap-4">
+        <div
+          className={`z-50 rounded-2xl border border-gray-700/50 bg-gray-900/95 p-4 shadow-2xl backdrop-blur-xl flex flex-col gap-4 ${
+            dropdownPosition === 'absolute' ? 'absolute left-0 top-full mt-3' : 'relative mt-3'
+          }`}
+        >
           <div className="text-sm font-bold text-gray-300 border-b border-gray-700 pb-2">
             Date Range: {(draftStart || '---- -- --')} ~ {(draftEnd || '---- -- --')}
           </div>

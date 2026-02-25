@@ -159,6 +159,7 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
                   endDate={draft.eventTimeEnd}
                   layout="vertical"
                   inline
+                  dropdownPosition="relative"
                   onApply={(nextStart, nextEnd) => {
                     setVal('eventTimeStart', nextStart);
                     setVal('eventTimeEnd', nextEnd);

@@ -576,6 +576,7 @@ export default function DashboardPage() {
             startDate={filters.eventTimeStart}
             endDate={filters.eventTimeEnd}
             onApply={handleQuickDateRangeChange}
+            dropdownPosition="absolute"
           />
         <button
           type="button"
