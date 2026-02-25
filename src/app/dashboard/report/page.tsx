@@ -145,15 +145,12 @@ export default function PeriodRangePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white px-6 py-10">
+    <div className="min-h-screen bg-gray-900 text-white px-6 py-10">
       <div className="max-w-4xl mx-auto space-y-6"> {/* 너비를 3xl -> 4xl로 확장하여 3단 배치 고려 */}
 
         {/* 헤더 */}
         <div>
-          <h1 className="text-3xl font-black tracking-tight">진단 리포트</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            기간별 진단 리포트를 확인하세요.
-          </p>
+          <h1 className="text-2xl font-black tracking-tight">진단 리포트</h1>
         </div>
 
         {/* 컨트롤 박스 (좌/중/우 배치 컨테이너) */}
@@ -222,23 +219,23 @@ export default function PeriodRangePage() {
              <div className="flex bg-gray-950 p-1 rounded-xl w-max border border-gray-800 h-[46px] items-center">
                <button
                  onClick={() => setRangeType("WEEKLY")}
-                 className={`px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all h-full ${
+                 className={`px-5 py-2 rounded-lg text-sm font-black uppercase tracking-wider transition-all h-full ${
                    rangeType === "WEEKLY"
                      ? "bg-blue-600 text-white shadow-md"
                      : "text-gray-500 hover:text-white hover:bg-gray-800"
                  }`}
                >
-                 Weekly
+                 주간
                </button>
                <button
                  onClick={() => setRangeType("MONTHLY")}
-                 className={`px-5 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all h-full ${
+                 className={`px-5 py-2 rounded-lg text-sm font-black uppercase tracking-wider transition-all h-full ${
                    rangeType === "MONTHLY"
                      ? "bg-blue-600 text-white shadow-md"
                      : "text-gray-500 hover:text-white hover:bg-gray-800"
                  }`}
                >
-                 Monthly
+                 월간
                </button>
              </div>
           </div>

@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       "key": "anomaly",
       "url": '/dashboard/anomaly',
-      "name": "보고서 목록",
+      "name": "이상 징후 보고서",
       "admin_only": true
     },
     {
@@ -129,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }
             </nav>
           </div>
-          <div className="mx-4 min-w-0 flex-1 flex justify-center">
+          <div className="mx-7 min-w-0 flex-1 flex justify-start">
             {loginUser?.role === 'ADMIN' &&
               <HeaderUploadWidget />
             }
