@@ -35,7 +35,7 @@ const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(
 const addMonths = (date: Date, months: number) =>
   new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
 
-const yearMonthTitle = (date: Date) => `${date.getFullYear() + 1}년 ${date.getMonth() + 1}월`;
+const yearMonthTitle = (date: Date) => `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
 
 function buildMonthCells(month: Date) {
   const first = startOfMonth(month);

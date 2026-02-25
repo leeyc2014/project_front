@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CompleteSummary, LogisticsData, LogEntry } from "@/types/headerUploadWidget";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAtom } from "jotai";
 import { FaCloudUploadAlt } from "react-icons/fa";
 import { dashboardReloadTriggerAtom } from "@/atoms/atom";
+import { createPortal } from "react-dom"; 
 
 const DEFAULT_FILE_LABEL = "No file selected";
 
@@ -58,16 +59,20 @@ const readCompleteSummary = (payload: unknown): CompleteSummary | null => {
 
 export default function HeaderUploadWidget() {
   const router = useRouter();
+  const pathname = usePathname();
+
+  const [mounted, setMounted] = useState(false);
 
   const [dashboardReloadTrigger, setDashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
 
   const [isVisible, setVisible] = useState<boolean>(false);
 
+  const [errorMsg, setErrorMsg] = useState<string>("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [percent, setPercent] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState<boolean>(false);
-  const [isLogDetailVisible, setLogDetailVisible] = useState<boolean>(false);
+  const [isLogDetailVisible, setIsLogDetailVisible] = useState<boolean>(false);
   const [selectedFileName, setSelectedFileName] = useState<string>(DEFAULT_FILE_LABEL);
   const [resultSummary, setResultSummary] = useState<CompleteSummary | null>(null);
 
@@ -88,6 +93,8 @@ export default function HeaderUploadWidget() {
   }, [isLogModalOpen, logs]);
 
   useEffect(() => {
+    setMounted(true);
+
     return () => {
       if (uploadAbortControllerRef.current) {
         uploadAbortControllerRef.current.abort();
@@ -111,20 +118,20 @@ export default function HeaderUploadWidget() {
     setLogs((prev) => [...prev, { time, message: msg }]);
   };
 
-  const handleCompleteAlert = (summary: CompleteSummary) => {
+  const handleComplete = (summary: CompleteSummary) => {
     if (completeAlertedRef.current) return;
     completeAlertedRef.current = true;
 
     setResultSummary(summary);
     setIsLogModalOpen(true);
-    setLogDetailVisible(false);
+    setIsLogDetailVisible(false);
 
     const errorCount = toFiniteNumber(summary.errorCount);
     const cautionCount = toFiniteNumber(summary.cautionCount);
 
     // 이 2개는 errorCount에 포함됨
-    const locationErrorCount = toFiniteNumber(summary.locationErrorCount);
-    const timeErrorCount = toFiniteNumber(summary.timeErrorCount);
+    //const locationErrorCount = toFiniteNumber(summary.locationErrorCount);
+    //const timeErrorCount = toFiniteNumber(summary.timeErrorCount);
 
     const clonedCount = toFiniteNumber(summary.clonedCount);
     const redundantCount = toFiniteNumber(summary.redundantCount);
@@ -138,11 +145,6 @@ export default function HeaderUploadWidget() {
   // 모달 닫기 시 대시보드 리로드 처리
   const handleCloseModal = () => {
     setIsLogModalOpen(false);
-
-    // resultSummary가 존재한다면(분석이 완료된 상태라면) 모달이 닫힐 때 대시보드를 갱신
-    if (resultSummary) {
-      setDashboardReloadTrigger(prev => prev + 1);
-    }
   };
 
   const processLine = (jsonString: string) => {
@@ -170,10 +172,10 @@ export default function HeaderUploadWidget() {
     if (data.event === "complete" && summary) {
       addLog(JSON.stringify(summary));
 
-      // TODO. Alert이 아니라 디자인된 dialog 표시
-      const isError = handleCompleteAlert(summary);
+      handleComplete(summary);
 
-      if (isError) {
+      // 완료 후 대시보드 갱신
+      if(pathname === '/dashboard') {
         setDashboardReloadTrigger(prev => prev + 1);
       }
     }
@@ -198,6 +200,7 @@ export default function HeaderUploadWidget() {
     setPercent(0);
     setResultSummary(null);
     setIsProcessing(true);
+    setErrorMsg("");
     interruptionNotifiedRef.current = false;
     completeAlertedRef.current = false;
 
@@ -258,7 +261,11 @@ export default function HeaderUploadWidget() {
       }
 
       if (!isError) {
-        addLog("✅ 모든 작업이 완료되었습니다.");
+        addLog("모든 작업이 완료되었습니다.");
+      } else {
+        setErrorMsg("일시적으로 문제가 발생했습니다.");
+        setIsLogModalOpen(true);
+        setIsLogDetailVisible(true);
       }
 
       setPercent(100);
@@ -280,11 +287,11 @@ export default function HeaderUploadWidget() {
 
   const latestLog = logs.length > 0 ? logs[logs.length - 1] : null;
   const hasSelectedFile = selectedFileName !== DEFAULT_FILE_LABEL;
-  //const canOpenLogModal = isProcessing || logs.length > 0;
+  const canOpenLogModal = isProcessing || logs.length > 0;
 
   return (
     <>
-      <div className="w-150 max-w-245 rounded-md bg-gray-900/60 px-2 py-1.5">
+      <div className="w-180 max-w-245 rounded-md bg-gray-900/60 px-2 py-1.5">
         <div className="flex items-center gap-2">
           <div className="">
             <FaCloudUploadAlt className={`text-xl cursor-pointer transition-all ${isVisible ? '' : 'text-gray-400'} hover:text-white`} title='CSV 업로드' onClick={() => setVisible(prev => !prev)} />
@@ -296,6 +303,7 @@ export default function HeaderUploadWidget() {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                accept="text/csv"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   setLogs([]);
@@ -317,7 +325,7 @@ export default function HeaderUploadWidget() {
 
             <div className="min-w-0 flex-[0.9] mx-2">
               <div className="flex items-center gap-2">
-                <div className="w-20 text-[9px] font-bold text-gray-300">{percent}%</div>
+                <div className="w-8 text-[9px] font-bold text-gray-300">{percent}%</div>
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-700">
                   <div
                     className="h-full bg-cyan-400 transition-all duration-300"
@@ -344,28 +352,34 @@ export default function HeaderUploadWidget() {
                   {isProcessing ? "처리 중..." : "업로드 및 분석 시작"}
                 </button>
 
-                {/* <button
+                <button
                   type="button"
                   onClick={() => setIsLogModalOpen(true)}
                   className={`w-27.5 rounded-md border border-red-500/70 bg-red-500/20 px-2 py-1 text-[10px] font-bold text-red-200 hover:bg-red -500/30 ${canOpenLogModal ? "" : "invisible pointer-events-none"
                     }`}
                 >
                   로그 자세히 보기
-                </button> */}
+                </button>
               </div>
             </div>
           </>)}
         </div>
       </div>
 
-      {isLogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      {isLogModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-150 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-gray-700 bg-gray-900 shadow-2xl">
             {/* 헤더 */}
             <div className="flex items-center justify-between border-b border-gray-800 bg-gray-900/80 px-6 py-4">
               <h3 className="text-lg font-bold text-white">물류 데이터 분석 상세</h3>
               <span className="text-sm font-semibold text-gray-400">진행률: {percent}%</span>
             </div>
+
+            {
+              errorMsg && (
+                <div className="mt-5 text-center font-bold text-lg text-red-500">{errorMsg}</div>
+              )
+            }
 
             <div className="flex max-h-[75vh] flex-col overflow-y-auto p-6">
 
@@ -386,7 +400,7 @@ export default function HeaderUploadWidget() {
                 // 표시할 이슈 항목들을 배열로 구성하여 유연하게 렌더링
                 const issueItems = [
                   { label: "위험", count: err, style: "text-red-400 bg-red-500/10 border-red-500/20" },
-                  { label: "경고", count: cau, style: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
+                  { label: "주의", count: cau, style: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
                   { label: "거점 이동 오류", count: locErr, style: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
                   { label: "이동 속도 오류", count: timeErr, style: "text-rose-400 bg-rose-500/10 border-rose-500/20" },
                   { label: "미등록 EPC", count: unreg, style: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" },
@@ -399,7 +413,7 @@ export default function HeaderUploadWidget() {
                   <div className={`mb-6 rounded-xl border p-5 ${isError ? 'border-red-900/50 bg-red-950/20' : 'border-green-900/50 bg-green-950/20'}`}>
                     <div className="mb-4 flex items-center justify-between border-b border-gray-800 pb-3">
                       <h4 className={`text-base font-bold ${isError ? 'text-red-400' : 'text-green-400'}`}>
-                        {isError ? '⚠️ 이슈 발견' : '✅ 성공적으로 처리됨'}
+                        {isError ? '⚠️ 이슈 발견' : '성공적으로 처리됨'}
                       </h4>
                       <div className="text-sm text-gray-300">
                         총 <strong className="text-white">{toFiniteNumber(resultSummary.totalProcessed)}</strong>건 분석 완료
@@ -417,7 +431,7 @@ export default function HeaderUploadWidget() {
                       </div>
                     ) : (
                       <p className="py-2 text-center text-sm font-medium text-green-300/80">
-                        모든 물류 데이터가 무결성 위반 없이 정상적으로 등록되었습니다.
+                        모든 물류 데이터가 정상적으로 등록되었습니다.
                       </p>
                     )}
                   </div>
@@ -448,7 +462,7 @@ export default function HeaderUploadWidget() {
             {/* 푸터 영역: 닫기 시 대시보드 새로고침 발동 */}
             <div className="flex justify-end border-t border-gray-800 bg-gray-900/80 px-6 py-4 gap-2">
               <button
-                onClick={()=>setLogDetailVisible(prev => !prev)}
+                onClick={()=>setIsLogDetailVisible(prev => !prev)}
                 className="rounded-lg bg-green-700 px-6 py-2 text-sm font-bold text-white transition-all hover:bg-green-600 hover:shadow-lg hover:shadow-blue-500/20 active:scale-95"
               >
                 상세 로그
@@ -461,7 +475,8 @@ export default function HeaderUploadWidget() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </>
