@@ -5,33 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
 import { loginUserAtom } from "@/atoms/atom";
 import type { User } from "@/types/user";
-
-type Member = {
-  id: string;
-  name: string;
-  role: string;
-  enabled: boolean;
-};
-
-type MemberListResponse = {
-  content: Member[];
-  totalElements?: number;
-};
-
-type EditForm = {
-  id: string;
-  password: string;
-  name: string;
-  role: string;
-  enabled: boolean;
-};
-
-type CreateForm = {
-  id: string;
-  password: string;
-  name: string;
-  role: string;
-};
+import type { Member, EditForm, CreateForm, MemberListResponse } from "@/types/members";
 
 function getToken(): string {
   if (typeof window === "undefined") return "";
@@ -336,7 +310,7 @@ export default function MembersPage() {
 
             <div className="px-6 py-5 space-y-4">
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">id</label>
+                <label className="text-sm text-gray-400 mb-1 block">ID</label>
                 <input
                   type="text"
                   value={editForm.id}
@@ -347,17 +321,18 @@ export default function MembersPage() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">password</label>
+                <label className="text-sm text-gray-400 mb-1 block">비밀번호</label>
                 <input
                   type="text"
                   value={editForm.password}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="변경하려면 입력하세요"
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">name</label>
+                <label className="text-sm text-gray-400 mb-1 block">이름</label>
                 <input
                   type="text"
                   value={editForm.name}
@@ -367,7 +342,7 @@ export default function MembersPage() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">role</label>
+                <label className="text-sm text-gray-400 mb-1 block">권한</label>
                 <div className={`grid grid-cols-2 gap-2 ${isEditingMe ? "opacity-50" : ""}`}>
                   {(["ADMIN", "USER"] as const).map((role) => (
                     <label
@@ -471,7 +446,7 @@ export default function MembersPage() {
 
             <div className="px-6 py-5 space-y-4">
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">id</label>
+                <label className="text-sm text-gray-400 mb-1 block">ID</label>
                 <input
                   type="text"
                   value={createForm.id}
@@ -481,7 +456,7 @@ export default function MembersPage() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">password</label>
+                <label className="text-sm text-gray-400 mb-1 block">비밀번호</label>
                 <input
                   type="text"
                   value={createForm.password}
@@ -491,7 +466,7 @@ export default function MembersPage() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">name</label>
+                <label className="text-sm text-gray-400 mb-1 block">이름</label>
                 <input
                   type="text"
                   value={createForm.name}
@@ -501,7 +476,7 @@ export default function MembersPage() {
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">role</label>
+                <label className="text-sm text-gray-400 mb-1 block">권한</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(["ADMIN", "USER"] as const).map((role) => (
                     <label
