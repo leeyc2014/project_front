@@ -7,6 +7,7 @@ import { EVENT_TYPE_LABELS } from '@/constants/eventType';
 import type {
   BarOptionsConfig,
   ChartSectionProps,
+  HubDefectTab,
   TimelineModalProps,
   XAxisCategory,
 } from '@/types/chartSection';
@@ -150,6 +151,8 @@ const buildBarOptions = (
   yaxis: {
     title: { text: yTitle, style: { fontSize: '10px', fontWeight: 700 } },
     labels: {
+      offsetX: config.yLabelOffsetX ?? 0,
+      offsetY: config.yLabelOffsetY ?? 0,
       formatter: config.horizontal
         ? ((value: string | number) => String(value))
         : (formatter ?? ((value: number) => Math.round(value).toString())),
@@ -179,7 +182,14 @@ const buildBarOptions = (
   colors: config.colors ?? ['#38bdf8'],
 });
 
-export default function ChartSection({ variant, data, hubLocationMap }: ChartSectionProps) {
+export default function ChartSection({
+  variant,
+  data,
+  hubLocationMap,
+  hubDefectTab = 'error',
+  onHubDefectTabChange,
+  onHubLocationSelect,
+}: ChartSectionProps) {
   const { series, options, emptyLabel } = useMemo(() => {
     if (variant === 'kpi') {
       const kpi = normalizeKpi(data?.kpi ?? (data as any)?.kpiResponse ?? (data as any)?.kpi_response);
@@ -187,10 +197,10 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
       const normalized = values;
 
       return {
-        series: [{ name: 'Ratio (%)', data: normalized }],
+        series: [{ data: normalized }],
         options: buildBarOptions(
           KPI_LABELS.map(({ label }) => toTwoLineLabel(label)),
-          'Ratio (%)',
+          '',
           (value) => `${value.toFixed(2)}%`,
           {
             compact: true,
@@ -218,9 +228,21 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
         aggregated[locationId].error += toNumber(hub?.errorCount ?? hub?.error_count);
       });
 
+      const getTotalDefect = (stats: { count: number; caution: number; error: number }) => stats.error + stats.caution;
+      const sortBy: Record<HubDefectTab, (stats: { count: number; caution: number; error: number }) => number> = {
+        error: (stats) => stats.error,
+        caution: (stats) => stats.caution,
+        total: (stats) => getTotalDefect(stats),
+      };
+      const getMetric = sortBy[hubDefectTab];
+
       const topHubsByDefect = Object.entries(aggregated)
         .filter(([, stats]) => stats.error > 0 || stats.caution > 0)
         .sort((a, b) => {
+          const primaryDiff = getMetric(b[1]) - getMetric(a[1]);
+          if (primaryDiff !== 0) return primaryDiff;
+          const totalDiff = getTotalDefect(b[1]) - getTotalDefect(a[1]);
+          if (totalDiff !== 0) return totalDiff;
           const errorDiff = b[1].error - a[1].error;
           if (errorDiff !== 0) return errorDiff;
           const cautionDiff = b[1].caution - a[1].caution;
@@ -233,26 +255,94 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
         const mapped = hubLocationMap?.[locationId];
         return mapped || locationId;
       });
+      const locationIds = topHubsByDefect.map(([locationId]) => locationId);
       const cautionPoints = topHubsByDefect.map(([, stats]) => stats.caution);
       const errorPoints = topHubsByDefect.map(([, stats]) => stats.error);
+      const totalPoints = topHubsByDefect.map(([, stats]) => stats.error + stats.caution);
+      const labelPoints =
+        hubDefectTab === 'error'
+          ? errorPoints
+          : hubDefectTab === 'caution'
+          ? cautionPoints
+          : totalPoints;
+
+      const hubSeries =
+        hubDefectTab === 'error'
+          ? [{ name: 'Error Count', data: errorPoints }]
+          : hubDefectTab === 'caution'
+          ? [{ name: 'Caution Count', data: cautionPoints }]
+          : [
+              { name: 'Error Count', data: errorPoints },
+              { name: 'Caution Count', data: cautionPoints },
+            ];
+
+      const hubColors =
+        hubDefectTab === 'error'
+          ? ['#ef4444']
+          : hubDefectTab === 'caution'
+          ? ['#facc15']
+          : ['#ef4444', '#facc15'];
+      const hubOptionsBase = buildBarOptions(categories, '', undefined, {
+        xLabelRotate: 0,
+        xLabelMaxHeight: 80,
+        yLabelOffsetX: 10,
+        yLabelOffsetY: 0,
+        dataLabelsEnabled: true,
+        stacked: hubDefectTab === 'total',
+        showStackTotal: false,
+        columnWidth: '72%',
+        gridPaddingTop: -18,
+        gridPaddingBottom: -14,
+        colors: hubColors,
+        horizontal: true,
+      });
 
       return {
-        series: [
-          { name: 'Error Count', data: errorPoints },
-          { name: 'Caution Count', data: cautionPoints },
-        ],
-        options: buildBarOptions(categories, 'Defect Count', undefined, {
-          xLabelRotate: 0,
-          xLabelMaxHeight: 80,
-          dataLabelsEnabled: true,
-          stacked: true,
-          showStackTotal: true,
-          columnWidth: '72%',
-          gridPaddingTop: -18,
-          gridPaddingBottom: -14,
-          colors: ['#ef4444', '#facc15'],
-          horizontal: true,
-        }),
+        series: hubSeries,
+        options: {
+          ...hubOptionsBase,
+          chart: {
+            ...hubOptionsBase.chart,
+            events: {
+              dataPointSelection: (_event: unknown, _chartContext: unknown, config: any) => {
+                const index = Number(config?.dataPointIndex);
+                if (!Number.isFinite(index) || index < 0 || index >= locationIds.length) return;
+                const selectedLocationId = locationIds[index];
+                if (!selectedLocationId || !onHubLocationSelect) return;
+                onHubLocationSelect(selectedLocationId);
+              },
+            },
+          },
+          plotOptions: {
+            ...(hubOptionsBase as any).plotOptions,
+            bar: {
+              ...(hubOptionsBase as any).plotOptions?.bar,
+              dataLabels: {
+                ...((hubOptionsBase as any).plotOptions?.bar?.dataLabels ?? {}),
+                position: 'top',
+              },
+            },
+          },
+          dataLabels: {
+            ...(hubOptionsBase as any).dataLabels,
+            offsetX: -8,
+            textAnchor: 'start',
+            formatter: (_value: number, opts: any) => {
+              const index = Number(opts?.dataPointIndex);
+              if (!Number.isFinite(index) || index < 0 || index >= labelPoints.length) return '';
+              if (hubDefectTab === 'total' && Number(opts?.seriesIndex) !== hubSeries.length - 1) return '';
+              return String(labelPoints[index]);
+            },
+          },
+          states: {
+            ...(hubOptionsBase as any).states,
+            active: {
+              ...((hubOptionsBase as any).states?.active ?? {}),
+              filter: { type: 'none' },
+            },
+          },
+          legend: { show: false },
+        },
         emptyLabel: 'No hub defect data',
       };
     }
@@ -280,16 +370,19 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
         { name: 'Caution Count', data: cautionPoints },
       ],
       options: {
-        ...buildBarOptions(categories, 'Defect Count', undefined, {
+        ...buildBarOptions(categories, '', undefined, {
           compact: true,
           xLabelRotate: -45,
           xLabelMaxHeight: 80,
+          yLabelOffsetX: -10,
+          yLabelOffsetY: 0,
           dataLabelsEnabled: false,
           stacked: true,
           showStackTotal: true,
           columnWidth: '50%',
           colors: ['#ef4444', '#facc15'],
         }),
+        legend: { show: false },
         tooltip: {
           theme: 'dark',
           shared: true,
@@ -316,12 +409,92 @@ export default function ChartSection({ variant, data, hubLocationMap }: ChartSec
       },
       emptyLabel: 'No event type data',
     };
-  }, [data, hubLocationMap, variant]);
+  }, [data, hubDefectTab, hubLocationMap, onHubLocationSelect, variant]);
+
+  const toggleHubDefectMetric = (metric: 'error' | 'caution') => {
+    if (!onHubDefectTabChange) return;
+    if (metric === 'error') {
+      if (hubDefectTab === 'caution') {
+        onHubDefectTabChange('total');
+        return;
+      }
+      if (hubDefectTab === 'total') {
+        onHubDefectTabChange('caution');
+        return;
+      }
+      onHubDefectTabChange('error');
+      return;
+    }
+
+    if (hubDefectTab === 'error') {
+      onHubDefectTabChange('total');
+      return;
+    }
+    if (hubDefectTab === 'total') {
+      onHubDefectTabChange('error');
+      return;
+    }
+    onHubDefectTabChange('caution');
+  };
 
   if (!series[0]?.data?.length) {
     return (
       <div className="h-full flex items-center justify-center text-xs font-bold text-white">
         {emptyLabel}
+      </div>
+    );
+  }
+
+  if (variant === 'hub') {
+    const errorSelected = hubDefectTab === 'error' || hubDefectTab === 'total';
+    const cautionSelected = hubDefectTab === 'caution' || hubDefectTab === 'total';
+    return (
+      <div className="h-full flex flex-col">
+        <div className="min-h-0 flex-1">
+          <Chart options={options as any} series={series} type="bar" height="100%" />
+        </div>
+        <div className="pt-2 flex items-center justify-center gap-6 text-[11px] font-semibold">
+          <button
+            type="button"
+            onClick={() => toggleHubDefectMetric('error')}
+            className={`inline-flex items-center gap-1.5 transition-opacity ${
+              errorSelected ? 'text-gray-100 opacity-100' : 'text-gray-500 opacity-70'
+            }`}
+          >
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#ef4444]" />
+            <span>Error Count</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleHubDefectMetric('caution')}
+            className={`inline-flex items-center gap-1.5 transition-opacity ${
+              cautionSelected ? 'text-gray-100 opacity-100' : 'text-gray-500 opacity-70'
+            }`}
+          >
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#facc15]" />
+            <span>Caution Count</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'eventType') {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="min-h-0 flex-1">
+          <Chart options={options as any} series={series} type="bar" height="100%" />
+        </div>
+        <div className="pt-2 flex items-center justify-center gap-6 text-[11px] font-semibold">
+          <span className="inline-flex items-center gap-1.5 text-gray-100 opacity-100">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#ef4444]" />
+            <span>Error Count</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-gray-100 opacity-100">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#facc15]" />
+            <span>Caution Count</span>
+          </span>
+        </div>
       </div>
     );
   }

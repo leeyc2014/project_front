@@ -11,6 +11,7 @@ import ChartSection, { EpcTimelineModal } from '@/components/dashboard/ChartSect
 import DashboardLoadingOverlay from '@/components/dashboard/DashboardLoadingOverlay';
 import DateRangeQuickPicker from '@/components/dashboard/DateRangeQuickPicker';
 import type { RouteData } from '@/types/logisticsMap';
+import type { HubDefectTab } from '@/types/chartSection';
 import { useAtom } from 'jotai';
 import { dashboardReloadTriggerAtom } from '@/atoms/atom';
 
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   };
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [hubDefectTab, setHubDefectTab] = useState<HubDefectTab>('error');
   const { backendEvents, filterOptions, locationList, totalPages, totalElements, isLoading } = useRawDashboardData(pageParam, size, status, filters);
   const [chartData, setChartData] = useState<any>(null);
   const [isChartLoading, setIsChartLoading] = useState(true);
@@ -199,6 +201,7 @@ export default function DashboardPage() {
     const params = new URLSearchParams(searchParams.toString());
     setFilters({
       factoryLocationTypes: parseIds(params.get('factoryLocations')),
+      warehouseLocationTypes: parseIds(params.get('warehouseLocations')),
       logisticCenterLocationTypes: parseIds(params.get('logisticCenterLocations')),
       salerLocationTypes: parseIds(params.get('salerLocations')),
       retailerLocationTypes: parseIds(params.get('retailerLocations')),
@@ -241,6 +244,7 @@ export default function DashboardPage() {
         const query = new URLSearchParams();
 
         setIfPresent(query, 'factoryLocations', toCsv(filters.factoryLocationTypes));
+        setIfPresent(query, 'warehouseLocations', toCsv(filters.warehouseLocationTypes));
         setIfPresent(query, 'logisticCenterLocations', toCsv(filters.logisticCenterLocationTypes));
         setIfPresent(query, 'salerLocations', toCsv(filters.salerLocationTypes));
         setIfPresent(query, 'retailerLocations', toCsv(filters.retailerLocationTypes));
@@ -449,6 +453,120 @@ export default function DashboardPage() {
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
 
+  const handleRouteLocationSelect = useCallback((fromLocationId: string, toLocationId: string) => {
+    setTimelineOpen(false);
+
+    const normalizeId = (value: string) => String(value || '').trim();
+    const routeLocationIds = Array.from(
+      new Set([normalizeId(fromLocationId), normalizeId(toLocationId)].filter((value) => value.length > 0))
+    );
+
+    const groupKeys = [
+      'factoryLocationTypes',
+      'warehouseLocationTypes',
+      'logisticCenterLocationTypes',
+      'salerLocationTypes',
+      'retailerLocationTypes',
+    ] as const;
+    const grouped: Record<(typeof groupKeys)[number], string[]> = {
+      factoryLocationTypes: [],
+      warehouseLocationTypes: [],
+      logisticCenterLocationTypes: [],
+      salerLocationTypes: [],
+      retailerLocationTypes: [],
+    };
+
+    const optionGroups: Record<(typeof groupKeys)[number], Set<string>> = {
+      factoryLocationTypes: new Set((filterOptions.factoryLocationTypes || []).map((item) => String(item.key).trim())),
+      warehouseLocationTypes: new Set((filterOptions.warehouseLocationTypes || []).map((item) => String(item.key).trim())),
+      logisticCenterLocationTypes: new Set((filterOptions.logisticCenterLocationTypes || []).map((item) => String(item.key).trim())),
+      salerLocationTypes: new Set((filterOptions.salerLocationTypes || []).map((item) => String(item.key).trim())),
+      retailerLocationTypes: new Set((filterOptions.retailerLocationTypes || []).map((item) => String(item.key).trim())),
+    };
+
+    const resolveGroupKeyFromType = (rawType: string): (typeof groupKeys)[number] | null => {
+      const locationType = rawType.trim().toUpperCase();
+      if (!locationType) return null;
+      if (locationType.includes('FACTORY') || locationType.includes('공장')) return 'factoryLocationTypes';
+      if (locationType.includes('WAREHOUSE') || locationType.includes('창고')) return 'warehouseLocationTypes';
+      if (locationType.includes('LOGISTIC') || locationType.includes('CENTER') || locationType.includes('물류')) {
+        return 'logisticCenterLocationTypes';
+      }
+      if (locationType.includes('SALER') || locationType.includes('WHOLESALE') || locationType.includes('도매')) {
+        return 'salerLocationTypes';
+      }
+      if (locationType.includes('RETAIL') || locationType.includes('소매')) return 'retailerLocationTypes';
+      return null;
+    };
+
+    routeLocationIds.forEach((locationId) => {
+      const matchedKeyFromOptions = groupKeys.find((key) => optionGroups[key].has(locationId));
+      if (matchedKeyFromOptions) {
+        grouped[matchedKeyFromOptions].push(locationId);
+        return;
+      }
+
+      const locationInfo = (locationList || []).find(
+        (location) => String((location as any)?.locationId ?? '').trim() === locationId
+      );
+      const matchedKey = resolveGroupKeyFromType(String((locationInfo as any)?.type ?? ''));
+      if (matchedKey) {
+        grouped[matchedKey].push(locationId);
+        return;
+      }
+
+      // Fallback: type 매핑이 불가능하면 모든 location 그룹에 넣어서 from/to 둘 다 필터에 반영되게 한다.
+      groupKeys.forEach((key) => grouped[key].push(locationId));
+    });
+
+    groupKeys.forEach((key) => {
+      grouped[key] = Array.from(new Set(grouped[key]));
+    });
+
+    const toCsv = (list: string[]) => {
+      const values = list
+        .map((value) => String(value).trim())
+        .filter((value) => value.length > 0 && value !== '0');
+      return values.length ? values.join(',') : '';
+    };
+    const setOrDelete = (params: URLSearchParams, key: string, value: string) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    };
+
+    const current = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams();
+    for (const [key, value] of current.entries()) {
+      if (
+        key === 'status' ||
+        key === 'st' ||
+        key === 'page' ||
+        key === 'size' ||
+        key === 'factoryLocations' ||
+        key === 'warehouseLocations' ||
+        key === 'logisticCenterLocations' ||
+        key === 'salerLocations' ||
+        key === 'retailerLocations'
+      ) {
+        continue;
+      }
+      params.set(key, value);
+    }
+
+    params.set('page', '0');
+    setOrDelete(params, 'factoryLocations', toCsv(grouped.factoryLocationTypes));
+    setOrDelete(params, 'warehouseLocations', toCsv(grouped.warehouseLocationTypes));
+    setOrDelete(params, 'logisticCenterLocations', toCsv(grouped.logisticCenterLocationTypes));
+    setOrDelete(params, 'salerLocations', toCsv(grouped.salerLocationTypes));
+    setOrDelete(params, 'retailerLocations', toCsv(grouped.retailerLocationTypes));
+
+    router.push(`/dashboard?${params.toString()}`);
+  }, [filterOptions, locationList, router, searchParams]);
+
+  const handleHubLocationSelect = useCallback((locationId: string) => {
+    handleRouteLocationSelect(locationId, locationId);
+  }, [handleRouteLocationSelect]);
+
   const handleApplyFilters = useCallback((nextFilters: FilterState) => {
     setTimelineOpen(false);
     setFilters(nextFilters);
@@ -480,6 +598,7 @@ export default function DashboardPage() {
     }
 
     setOrDelete(params, 'factoryLocations', toCsv(nextFilters.factoryLocationTypes));
+    setOrDelete(params, 'warehouseLocations', toCsv(nextFilters.warehouseLocationTypes));
     setOrDelete(params, 'logisticCenterLocations', toCsv(nextFilters.logisticCenterLocationTypes));
     setOrDelete(params, 'salerLocations', toCsv(nextFilters.salerLocationTypes));
     setOrDelete(params, 'retailerLocations', toCsv(nextFilters.retailerLocationTypes));
@@ -563,7 +682,7 @@ export default function DashboardPage() {
           routes={isMapPending ? [] : (mapRoutes.length > 0 ? mapRoutes : [])}
           resetToken={resetToken}
           viewportPadding={mapPadding}
-          onRouteStatusSelect={handleStatusChange}
+          onRouteLocationSelect={handleRouteLocationSelect}
           patternAnimationEnabled={isPatternAnimationEnabled}
         />
       </div>
@@ -726,7 +845,14 @@ export default function DashboardPage() {
                   </Section>
                 </div>
                 <Section title="Hub Defect Count">
-                  <ChartSection variant="hub" data={chartData} hubLocationMap={hubLocationMap} />
+                  <ChartSection
+                    variant="hub"
+                    data={chartData}
+                    hubLocationMap={hubLocationMap}
+                    hubDefectTab={hubDefectTab}
+                    onHubDefectTabChange={setHubDefectTab}
+                    onHubLocationSelect={handleHubLocationSelect}
+                  />
                 </Section>
                 <Section title="Event Type Defect Count">
                   <ChartSection variant="eventType" data={chartData} />

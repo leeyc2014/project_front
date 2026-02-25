@@ -13,6 +13,7 @@ export function useRawDashboardData(
   const [totalElements, setTotalElements] = useState(0);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     factoryLocationTypes: [],
+    warehouseLocationTypes: [],
     logisticCenterLocationTypes: [],
     salerLocationTypes: [],
     retailerLocationTypes: [],
@@ -178,6 +179,7 @@ export function useRawDashboardData(
         }
 
         setIfPresent(query, 'factoryLocations', toQueryList(filters?.factoryLocationTypes));
+        setIfPresent(query, 'warehouseLocations', toQueryList(filters?.warehouseLocationTypes));
         setIfPresent(query, 'logisticCenterLocations', toQueryList(filters?.logisticCenterLocationTypes));
         setIfPresent(query, 'salerLocations', toQueryList(filters?.salerLocationTypes));
         setIfPresent(query, 'retailerLocations', toQueryList(filters?.retailerLocationTypes));
@@ -347,6 +349,7 @@ export function useRawDashboardData(
 
         setFilterOptions({
           factoryLocationTypes: normalizeOptions(filters.factoryLocationList || filters.factoryLocations || filters.factoryLocationTypes),
+          warehouseLocationTypes: normalizeOptions(filters.warehouseLocationList || filters.warehouseLocations || filters.warehouseLocationTypes),
           logisticCenterLocationTypes: normalizeOptions(filters.logisticCenterLocationList || filters.logisticCenterLocations || filters.logisticCenterLocationTypes),
           salerLocationTypes: normalizeOptions(filters.salerLocationList || filters.salerLocations || filters.salerLocationTypes),
           retailerLocationTypes: normalizeOptions(filters.retailerLocationList || filters.retailerLocations || filters.retailerLocationTypes),

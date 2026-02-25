@@ -77,7 +77,7 @@ export default function LogisticsMap({
   routes,
   resetToken,
   viewportPadding,
-  onRouteStatusSelect,
+  onRouteLocationSelect,
   patternAnimationEnabled = false,
 }: LogisticsMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +88,7 @@ export default function LogisticsMap({
   const [mapReady, setMapReady] = useState(false);
   const [routeData, setRouteData] = useState<RouteData[]>([]);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [patternPhase, setPatternPhase] = useState(0);
   const isValidCoords = (coords: [number, number] | undefined) =>
     Array.isArray(coords) && coords.length === 2 && coords.every((v) => Number.isFinite(v));
@@ -236,7 +237,14 @@ export default function LogisticsMap({
       }) => {
         if (!object) {
           setHoverInfo(null);
+          setHoveredNodeId(null);
           return;
+        }
+        const hoveredNode = (object as { nodeId?: string }).nodeId;
+        if (hoveredNode) {
+          setHoveredNodeId(hoveredNode);
+        } else {
+          setHoveredNodeId(null);
         }
         if (object.label) {
           setHoverInfo({ x, y, text: object.label });
@@ -358,6 +366,7 @@ export default function LogisticsMap({
     });
 
     type NodeVisualData = {
+      nodeId: string;
       position: [number, number];
       label: string;
       color: [number, number, number, number];
@@ -382,6 +391,7 @@ export default function LogisticsMap({
     const ensureNode = (key: string, position: [number, number], label: string) => {
       if (nodeMap.has(key)) return;
       nodeMap.set(key, {
+        nodeId: key,
         position,
         label,
         color: SAFE_NODE_COLOR,
@@ -395,7 +405,7 @@ export default function LogisticsMap({
       const color = severity === 0 ? SAFE_NODE_COLOR : getRouteColor(route);
       const existing = nodeMap.get(key);
       if (!existing) {
-        nodeMap.set(key, { position, label, color, severity, score });
+        nodeMap.set(key, { nodeId: key, position, label, color, severity, score });
         return;
       }
 
@@ -429,19 +439,8 @@ export default function LogisticsMap({
         pickable: true,
         autoHighlight: true,
         onClick: ({ object }: { object?: RouteData }) => {
-          if (!object || !onRouteStatusSelect) return;
-          const cautionCount = Math.max(0, Number(object.cautionCount ?? 0) || 0);
-          const errorCount = Math.max(0, Number(object.errorCount ?? 0) || 0);
-
-          if (errorCount > 0) {
-            onRouteStatusSelect('DANGER');
-            return;
-          }
-          if (cautionCount > 0) {
-            onRouteStatusSelect('CAUTION');
-            return;
-          }
-          onRouteStatusSelect('SAFE');
+          if (!object || !onRouteLocationSelect) return;
+          onRouteLocationSelect(object.source_info.id, object.target_info.id);
         },
       }),
       ...(patternAnimationEnabled
@@ -472,15 +471,19 @@ export default function LogisticsMap({
         data: nodes,
         getPosition: (d: NodeVisualData) => d.position,
         getFillColor: (d: NodeVisualData) => d.color,
-        getRadius: 6,
+        getRadius: (d: NodeVisualData) => (d.nodeId === hoveredNodeId ? 9 : 6),
         radiusUnits: 'pixels',
         stroked: true,
         getLineColor: (d: NodeVisualData) => d.color,
         getLineWidth: 1,
         pickable: true,
+        onClick: ({ object }: { object?: NodeVisualData }) => {
+          if (!object?.nodeId || !onRouteLocationSelect) return;
+          onRouteLocationSelect(object.nodeId, object.nodeId);
+        },
       }),
     ];
-  }, [mapReady, filteredRoutes, routeCountScale, onRouteStatusSelect, patternPhase, patternAnimationEnabled]);
+  }, [mapReady, filteredRoutes, routeCountScale, onRouteLocationSelect, patternPhase, patternAnimationEnabled, hoveredNodeId]);
 
   useEffect(() => {
     if (overlayRef.current) overlayRef.current.setProps({ layers });
