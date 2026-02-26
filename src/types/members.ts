@@ -8,6 +8,24 @@ export type Member = {
 export type MemberListResponse = {
   content: Member[];
   totalElements?: number;
+  totalPages?: number;
+  size?: number;
+  number?: number;
+  first?: boolean;
+  last?: boolean;
+  numberOfElements?: number;
+  empty?: boolean;
+};
+
+export type MemberPageInfo = {
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  empty: boolean;
 };
 
 export type EditForm = {

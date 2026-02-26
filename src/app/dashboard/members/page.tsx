@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
 import { loginUserAtom } from "@/atoms/atom";
 import type { User } from "@/types/user";
-import type { Member, EditForm, CreateForm, MemberListResponse } from "@/types/members";
+import type { Member, EditForm, CreateForm, MemberListResponse, MemberPageInfo } from "@/types/members";
 
 function getToken(): string {
   if (typeof window === "undefined") return "";
@@ -28,7 +28,8 @@ export default function MembersPage() {
   const [isMounted, setIsMounted] = useState(false);
 
   const [members, setMembers] = useState<Member[]>([]);
-  const [totalElements, setTotalElements] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageInfo, setPageInfo] = useState<MemberPageInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,39 +58,48 @@ export default function MembersPage() {
   }, []);
 
   useEffect(() => {
-    if (!isMounted) return;
-    if (!loginUser) return;
+    if (!isMounted || !loginUser) return;
     if (loginUser.role !== "ADMIN") {
       alert("관리자만 접근할 수 있는 페이지입니다.");
       router.replace("/dashboard");
     }
   }, [isMounted, loginUser, router]);
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async (pageNum: number) => {
     setLoading(true);
     setError(null);
     try {
       const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
-      const res = await fetch(`${base}/api/v1/member`, {
+      const res = await fetch(`${base}/api/v1/member?page=${pageNum}`, {
         method: "GET",
         headers: authHeaders(),
       });
       if (!res.ok) throw new Error(`회원 목록 조회 실패: HTTP ${res.status}`);
       const data: MemberListResponse = await res.json();
-      setMembers(data.content ?? []);
-      setTotalElements(data.totalElements ?? (data.content ?? []).length);
+      const list = data.content ?? [];
+      setMembers(list);
+      setPageInfo({
+        totalElements: data.totalElements ?? list.length,
+        totalPages: data.totalPages ?? 1,
+        size: data.size ?? list.length,
+        number: data.number ?? pageNum,
+        first: data.first ?? pageNum === 0,
+        last: data.last ?? true,
+        numberOfElements: data.numberOfElements ?? list.length,
+        empty: data.empty ?? list.length === 0,
+      });
     } catch (e: any) {
+      setPageInfo(null);
       setError(e.message || "회원 목록을 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (!isMounted) return;
-    if (!loginUser || loginUser.role !== "ADMIN") return;
-    fetchMembers();
-  }, [isMounted, loginUser]);
+    if (!isMounted || !loginUser || loginUser.role !== "ADMIN") return;
+    fetchMembers(page);
+  }, [fetchMembers, isMounted, loginUser, page]);
 
   const openEdit = (member: Member) => {
     setSelectedMember(member);
@@ -147,7 +157,7 @@ export default function MembersPage() {
 
       setIsEditOpen(false);
       setSelectedMember(null);
-      await fetchMembers();
+      await fetchMembers(page);
     } catch (e: any) {
       setError(e.message || "회원 수정 중 오류가 발생했습니다.");
     } finally {
@@ -180,7 +190,7 @@ export default function MembersPage() {
 
       setCreateForm({ id: "", password: "", name: "", role: "USER" });
       setIsCreateOpen(false);
-      await fetchMembers();
+      await fetchMembers(page);
     } catch (e: any) {
       setError(e.message || "회원 등록 중 오류가 발생했습니다.");
     } finally {
@@ -205,6 +215,27 @@ export default function MembersPage() {
   }
 
   const isEditingMe = selectedMember?.id === loginUser.id;
+  const totalPages = pageInfo?.totalPages ?? 1;
+  const renderPageButtons = () => {
+    if (totalPages <= 1) return null;
+    const maxBtn = 5;
+    let start = Math.max(0, page - Math.floor(maxBtn / 2));
+    let end = Math.min(totalPages - 1, start + maxBtn - 1);
+    if (end - start < maxBtn - 1) start = Math.max(0, end - maxBtn + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((i) => (
+      <button
+        key={i}
+        onClick={() => setPage(i)}
+        className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
+          i === page
+            ? "bg-blue-600 text-white shadow-md"
+            : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700"
+        }`}
+      >
+        {i + 1}
+      </button>
+    ));
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -213,7 +244,7 @@ export default function MembersPage() {
           <h1 className="text-2xl font-black text-white tracking-tight">회원 관리</h1>
           <button
             onClick={() => setIsCreateOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-black hover:bg-blue-500 transition-all border border-blue-500"
+            className="px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm font-black hover:bg-gray-700 disabled:opacity-50"
           >
             등록
           </button>
@@ -229,7 +260,9 @@ export default function MembersPage() {
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
             <h2 className="text-sm font-black text-white uppercase tracking-wider">회원 목록</h2>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-black text-white">{totalElements.toLocaleString()} 건</span>
+              <span className="text-sm font-black text-white">
+                {(pageInfo?.totalElements ?? members.length).toLocaleString()} 건
+              </span>
               {loading && <span className="text-sm text-blue-400 animate-pulse">불러오는 중...</span>}
             </div>
           </div>
@@ -253,7 +286,7 @@ export default function MembersPage() {
                     <th className="px-4 py-2 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">ID</th>
                     <th className="px-4 py-2 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">이름</th>
                     <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">권한</th>
-                    <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">활성화 여부</th>
+                    <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">활성 여부</th>
                     <th className="px-4 py-2 text-center text-[11px] font-black text-gray-400 uppercase tracking-wider">수정</th>
                   </tr>
                 </thead>
@@ -293,6 +326,38 @@ export default function MembersPage() {
             </div>
           )}
         </div>
+
+        {pageInfo && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            {[
+              { label: "«", action: () => setPage(0), disabled: pageInfo.first },
+              { label: "‹", action: () => setPage((p) => Math.max(0, p - 1)), disabled: pageInfo.first },
+            ].map(({ label, action, disabled }) => (
+              <button
+                key={label}
+                onClick={action}
+                disabled={disabled}
+                className="px-3 py-2 bg-gray-800 text-gray-400 rounded-lg text-xs font-bold hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 transition-all"
+              >
+                {label}
+              </button>
+            ))}
+            {renderPageButtons()}
+            {[
+              { label: "›", action: () => setPage((p) => Math.min(totalPages - 1, p + 1)), disabled: pageInfo.last },
+              { label: "»", action: () => setPage(totalPages - 1), disabled: pageInfo.last },
+            ].map(({ label, action, disabled }) => (
+              <button
+                key={label}
+                onClick={action}
+                disabled={disabled}
+                className="px-3 py-2 bg-gray-800 text-gray-400 rounded-lg text-xs font-bold hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 transition-all"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {isEditOpen && selectedMember && (
@@ -326,18 +391,16 @@ export default function MembersPage() {
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm disabled:opacity-50"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">비밀번호</label>
                 <input
-                  type="text"
+                  type="password"
                   value={editForm.password}
                   onChange={(e) => setEditForm((prev) => ({ ...prev, password: e.target.value }))}
                   placeholder="변경하려면 입력하세요"
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">이름</label>
                 <input
@@ -347,7 +410,6 @@ export default function MembersPage() {
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">권한</label>
                 <div className={`grid grid-cols-2 gap-2 ${isEditingMe ? "opacity-50" : ""}`}>
@@ -374,9 +436,8 @@ export default function MembersPage() {
                   ))}
                 </div>
               </div>
-
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">활성화 여부</label>
+                <label className="text-sm text-gray-400 mb-1 block">활성 여부</label>
                 <button
                   type="button"
                   disabled={isEditingMe}
@@ -405,7 +466,6 @@ export default function MembersPage() {
                   </span>
                 </button>
               </div>
-
               {isEditingMe && (
                 <p className="text-sm text-yellow-300">현재 로그인한 계정은 이름/비밀번호만 수정할 수 있습니다.</p>
               )}
@@ -422,7 +482,7 @@ export default function MembersPage() {
               <button
                 onClick={submitEdit}
                 disabled={saving}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-black hover:bg-blue-500 transition-all border border-blue-500 disabled:opacity-40 min-w-[72px]"
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-black hover:bg-blue-500 transition-all border border-blue-500 disabled:opacity-40"
               >
                 {saving ? "저장 중..." : "수정"}
               </button>
@@ -461,17 +521,15 @@ export default function MembersPage() {
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">비밀번호</label>
                 <input
-                  type="text"
+                  type="password"
                   value={createForm.password}
                   onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">이름</label>
                 <input
@@ -481,7 +539,6 @@ export default function MembersPage() {
                   className="w-full bg-gray-900 text-white px-3 py-2.5 rounded-xl border border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>
-
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">권한</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -520,7 +577,7 @@ export default function MembersPage() {
               <button
                 onClick={submitCreate}
                 disabled={saving}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-black hover:bg-blue-500 transition-all border border-blue-500 disabled:opacity-40 min-w-[72px]"
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-black hover:bg-blue-500 transition-all border border-blue-500 disabled:opacity-40"
               >
                 {saving ? "등록 중..." : "등록"}
               </button>

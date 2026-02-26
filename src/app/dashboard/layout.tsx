@@ -50,6 +50,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       "name": "회원 관리",
       "admin_only": true
     },
+    {
+      "key": "manage",
+      "url": "/dashboard/manage",
+      "name": "바코드 관리",
+      "admin_only": true
+    }
 
   ]
 
@@ -83,6 +89,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setSelectedMenu("anomaly");
     } else if (pathname.includes("/dashboard/members")) {
       setSelectedMenu("members");
+    } else if (pathname.includes("/dashboard/manage")) {
+      setSelectedMenu("manage");
     } else {
       setSelectedMenu("dashboard");
     }

@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@deck.gl/core": "^9.0.38",
-    "@deck.gl/geo-layers": "^8.9.15",
+    "@deck.gl/geo-layers": "^9.2.9",
     "@deck.gl/layers": "^9.0.38",
     "@deck.gl/mapbox": "^9.0.38",
     "@tanstack/react-virtual": "^3.13.18",
@@ -20,10 +20,12 @@
     "jspdf-autotable": "^5.0.7",
     "maplibre-gl": "^4.7.1",
     "next": "^16.1.6",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-apexcharts": "^1.9.0",
     "react-dom": "19.2.3",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "react-qr-code": "^2.0.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
