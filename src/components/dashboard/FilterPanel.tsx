@@ -47,6 +47,11 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
       label: `Location: ${resolveLabel(filterOptions?.factoryLocationTypes, v)}`,
       value: v,
     }))),
+    ...((draft.warehouseLocationTypes || []).map((v) => ({
+      key: 'warehouseLocationTypes',
+      label: `Location: ${resolveLabel(filterOptions?.warehouseLocationTypes, v)}`,
+      value: v,
+    }))),
     ...((draft.logisticCenterLocationTypes || []).map((v) => ({
       key: 'logisticCenterLocationTypes',
       label: `Location: ${resolveLabel(filterOptions?.logisticCenterLocationTypes, v)}`,
@@ -119,26 +124,22 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
               <span className="text-[16.5px] text-white">No filters selected.</span>
             ) : (
               selectedChips.map((chip) => (
-                <span
+                <button
                   key={`${chip.key}-${chip.value}`}
+                  type="button"
+                  onClick={() => {
+                    if (Array.isArray(draft[chip.key])) {
+                      removeValue(chip.key, chip.value);
+                    } else {
+                      const resetValue = chip.key === 'epcLot' || chip.key === 'epcSerial' ? null : '';
+                      setVal(chip.key, resetValue);
+                    }
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full bg-gray-800 text-white border border-gray-800"
                 >
-                  {chip.label}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (Array.isArray(draft[chip.key])) {
-                        removeValue(chip.key, chip.value);
-                      } else {
-                        const resetValue = chip.key === 'epcLot' || chip.key === 'epcSerial' ? null : '';
-                        setVal(chip.key, resetValue);
-                      }
-                    }}
-                    className="ml-1 text-white"
-                  >
-                    ×
-                  </button>
-                </span>
+                  <span>{chip.label}</span>
+                  <span className="ml-1 text-white">×</span>
+                </button>
               ))
             )}
           </div>
@@ -175,6 +176,12 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             options={filterOptions?.factoryLocationTypes || []} 
             selected={draft.factoryLocationTypes || []} 
             onToggle={(v:string) => toggle('factoryLocationTypes', v)} 
+          />
+          <FilterDetail 
+            title="LOCATION: 공장창고" 
+            options={filterOptions?.warehouseLocationTypes || []} 
+            selected={draft.warehouseLocationTypes || []} 
+            onToggle={(v:string) => toggle('warehouseLocationTypes', v)} 
           />
           <FilterDetail 
             title="LOCATION: 물류센터" 

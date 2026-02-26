@@ -72,6 +72,7 @@ export interface DashboardResponse {
 
 export type FilterState = {
   factoryLocationTypes: string[];
+  warehouseLocationTypes: string[];
   logisticCenterLocationTypes: string[];
   salerLocationTypes: string[];
   retailerLocationTypes: string[];
@@ -90,6 +91,7 @@ export type FilterState = {
 
 export type FilterOptions = {
   factoryLocationTypes: { key: string; value: string }[];
+  warehouseLocationTypes: { key: string; value: string }[];
   logisticCenterLocationTypes: { key: string; value: string }[];
   salerLocationTypes: { key: string; value: string }[];
   retailerLocationTypes: { key: string; value: string }[];
@@ -101,6 +103,7 @@ export type FilterOptions = {
 
 export const DEFAULT_FILTERS: FilterState = {
   factoryLocationTypes: [],
+  warehouseLocationTypes: [],
   logisticCenterLocationTypes: [],
   salerLocationTypes: [],
   retailerLocationTypes: [],

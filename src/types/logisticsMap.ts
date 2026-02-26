@@ -12,6 +12,6 @@ export type LogisticsMapProps = {
   routes?: RouteData[];
   resetToken?: number;
   viewportPadding?: { top: number; bottom: number; left: number; right: number };
-  onRouteStatusSelect?: (status: 'SAFE' | 'CAUTION' | 'DANGER') => void;
+  onRouteLocationSelect?: (fromLocationId: string, toLocationId: string) => void;
   patternAnimationEnabled?: boolean;
 };
