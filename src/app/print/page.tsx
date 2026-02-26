@@ -147,8 +147,7 @@ function PrintReportContent() {
 
           item.productName = productList.find((p: any) => p.id === item.epcProduct)?.label;
 
-          item.locationName = locationList.find((l:any)=>l.locationId === 4)?.locationName;
-
+          item.locationName = locationList.find((l:any)=>l.locationId === item.locationId)?.locationName;
         })
         setErrorList(logisErrorData);
 
