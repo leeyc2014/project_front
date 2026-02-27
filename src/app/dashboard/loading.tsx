@@ -1,5 +1,4 @@
-// src/app/dashboard/loading.tsx
-'use client';
+"use client";
 
 import { useEffect, useState } from 'react';
 import DashboardLoadingOverlay from '@/components/dashboard/DashboardLoadingOverlay';

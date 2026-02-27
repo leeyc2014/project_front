@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { RiskItem } from '@/types/dashboard';
 import { EVENT_TYPE_LABELS } from '@/constants/eventType';
@@ -11,31 +11,9 @@ import type {
   TimelineModalProps,
   XAxisCategory,
 } from '@/types/chartSection';
+import { KPI_LABELS, EVENT_TYPE_DISPLAY_ORDER } from '@/constants/chartSection';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
-
-const KPI_LABELS = [
-  { key: 'unregisteredEpc', label: '미등록 EPC' },
-  { key: 'integrityErrorEpc', label: '무결성 오류 EPC' },
-  { key: 'clonedEpc', label: '복제 EPC' },
-  { key: 'duplicateEpc', label: '중복 EPC' },
-  { key: 'invalidHubMove', label: '허용되지 않는 거점 이동' },
-  { key: 'impossibleSpeed', label: '불가능한 이동 속도' },
-] as const;
-
-
-const EVENT_TYPE_DISPLAY_ORDER = [
-  '공장',
-  '공장창고(In)',
-  '공장창고(Out)',
-  '물류센터(In)',
-  '물류센터(Out)',
-  '도매(In)',
-  '도매(Out)',
-  '소매(In)',
-  '소매(Out)',
-  '판매완료',
-] as const;
 
 const toNumber = (value: unknown) => {
   const num = Number(value);
@@ -510,6 +488,7 @@ export function EpcTimelineModal({
   onApplyEpcFilter,
   onClearEpcFilter,
   isEpcFilterApplied = false,
+  panelRef,
 }: TimelineModalProps) {
   const [pulseOn, setPulseOn] = useState(false);
   useEffect(() => {
@@ -641,7 +620,7 @@ export function EpcTimelineModal({
   if (!open) return null;
 
   return (
-    <div className="fixed right-[450px] top-24 z-40 w-[360px] max-w-[85vw]">
+    <div ref={panelRef} className="fixed right-[450px] top-24 z-40 w-[360px] max-w-[85vw]">
       <div className="rounded-2xl border border-gray-700 bg-gray-900/95 p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <div>

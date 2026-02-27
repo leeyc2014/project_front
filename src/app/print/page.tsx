@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { convertMessage } from "@/utils/aiMessageUtil";
+import { getAuthToken } from "@/utils/authToken";
 import { EVENT_TYPE_LABELS } from "@/constants/eventType";
-
-
 
 // 유형별 진단 레이블 상수
 const STATUS_LABELS: Record<string, string> = {
@@ -37,13 +36,6 @@ function PrintReportContent() {
 
   const [productName, setProductName] = useState<string>("전체");
 
-  const getToken = () => {
-    if (typeof window === 'undefined') return '';
-    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-    if (match) return decodeURIComponent(match[1]);
-    return sessionStorage.getItem('token') || '';
-  };
-
   useEffect(() => {
     if (!fromDate || !toDate) return;
 
@@ -51,7 +43,7 @@ function PrintReportContent() {
       setIsLoading(true);
       try {
         const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
-        const token = getToken();
+        const token = getAuthToken();
         const authHeaders = { Authorization: `Bearer ${token}` };
 
         // 3개 API 병렬 호출

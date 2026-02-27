@@ -1,17 +1,48 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_FILTERS, FilterState } from '@/types/dashboard';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { FilterState } from '@/types/dashboard';
+import { DEFAULT_FILTERS } from '@/constants/dashboard';
 import DateRangeQuickPicker from '@/components/dashboard/DateRangeQuickPicker';
+import type { AutoZoomSettings } from '@/types/logisticsMap';
+import { DEFAULT_AUTO_ZOOM_SETTINGS } from '@/constants/logisticsMap';
+import { DEFAULT_DASHBOARD_END_DATE, DEFAULT_DASHBOARD_START_DATE } from '@/constants/defaultDateRange';
+import type { FilterPanelProps } from '@/types/dashboard';
 
-export default function FilterPanel({ isOpen, onClose, filters, setFilters, filterOptions }: any) {
-  const [draft, setDraft] = useState<FilterState>(filters as FilterState);
+const cloneAutoZoomSettings = (settings?: AutoZoomSettings): AutoZoomSettings => ({
+  ...(settings || DEFAULT_AUTO_ZOOM_SETTINGS),
+});
+
+const toNullableNumber = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export default function FilterPanel({
+  isOpen,
+  onClose,
+  filters,
+  setFilters,
+  mapZoomSettings,
+  setMapZoomSettings,
+  filterOptions,
+}: FilterPanelProps) {
+  const [draft, setDraft] = useState<FilterState>(filters);
+  const [zoomDraft, setZoomDraft] = useState<AutoZoomSettings>(cloneAutoZoomSettings(mapZoomSettings));
   const [panelPhase, setPanelPhase] = useState<'shown' | 'hidden' | 'enter' | 'leave'>(isOpen ? 'shown' : 'hidden');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wasOpenRef = useRef(isOpen);
 
   useEffect(() => {
-    if (isOpen) setDraft(filters as FilterState);
-  }, [isOpen, filters]);
+    const wasOpen = wasOpenRef.current;
+    if (!wasOpen && isOpen) {
+      setDraft(filters);
+      setZoomDraft(cloneAutoZoomSettings(mapZoomSettings));
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, filters, mapZoomSettings]);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -27,14 +58,15 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
     };
   }, [isOpen]);
 
-  const setVal = (k: keyof FilterState, v: any) => setDraft((p: any) => ({ ...p, [k]: v }));
+  const setVal = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
+    setDraft((prev) => ({ ...prev, [key]: value }));
   const toggle = (k: keyof FilterState, v: string) => {
     const curr = (draft[k] as string[]) || [];
-    setVal(k, curr.includes(v) ? curr.filter(x => x !== v) : [...curr, v]);
+    setVal(k, (curr.includes(v) ? curr.filter(x => x !== v) : [...curr, v]) as FilterState[typeof k]);
   };
   const removeValue = (k: keyof FilterState, v: string) => {
     const curr = (draft[k] as string[]) || [];
-    setVal(k, curr.filter(x => x !== v));
+    setVal(k, curr.filter(x => x !== v) as FilterState[typeof k]);
   };
 
   const resolveLabel = (list: { key: string; value: string }[] | undefined, key: string) => {
@@ -69,11 +101,11 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
     }))),
     ...((draft.operatorIds || []).map((v) => ({ key: 'operatorIds', label: `Operator ID: ${resolveLabel(filterOptions?.operatorIds, v)}`, value: v }))),
     ...((draft.deviceIds || []).map((v) => ({ key: 'deviceIds', label: `Device ID: ${resolveLabel(filterOptions?.deviceIds, v)}`, value: v }))),
-    ...((draft.epcCompanies || []).map((v) => ({ key: 'epcCompanies', label: `EPC Company: ${resolveLabel(filterOptions?.epcCompanies, v)}`, value: v }))),
-    ...((draft.epcProducts || []).map((v) => ({ key: 'epcProducts', label: `EPC Product: ${resolveLabel(filterOptions?.epcProducts, v)}`, value: v }))),
-    ...(draft.epcCode ? [{ key: 'epcCode', label: `EPC Code: ${draft.epcCode}`, value: draft.epcCode }] : []),
-    ...(draft.epcLot != null ? [{ key: 'epcLot', label: `EPC Lot: ${draft.epcLot}`, value: String(draft.epcLot) }] : []),
-    ...(draft.epcSerial != null ? [{ key: 'epcSerial', label: `EPC Serial: ${draft.epcSerial}`, value: String(draft.epcSerial) }] : []),
+    ...((draft.epcCompanies || []).map((v) => ({ key: 'epcCompanies', label: `Company: ${resolveLabel(filterOptions?.epcCompanies, v)}`, value: v }))),
+    ...((draft.epcProducts || []).map((v) => ({ key: 'epcProducts', label: `Product: ${resolveLabel(filterOptions?.epcProducts, v)}`, value: v }))),
+    ...(draft.epcCode ? [{ key: 'epcCode', label: `Code: ${draft.epcCode}`, value: draft.epcCode }] : []),
+    ...(draft.epcLot != null ? [{ key: 'epcLot', label: `Lot: ${draft.epcLot}`, value: String(draft.epcLot) }] : []),
+    ...(draft.epcSerial != null ? [{ key: 'epcSerial', label: `Serial: ${draft.epcSerial}`, value: String(draft.epcSerial) }] : []),
     ...(draft.eventTimeStart ? [{ key: 'eventTimeStart', label: `EventTimeStart: ${draft.eventTimeStart}`, value: draft.eventTimeStart }] : []),
     ...(draft.eventTimeEnd ? [{ key: 'eventTimeEnd', label: `EventTimeEnd: ${draft.eventTimeEnd}`, value: draft.eventTimeEnd }] : []),
     ...(draft.manufactureDate ? [{ key: 'manufactureDate', label: `Manufacture Date: ${draft.manufactureDate}`, value: draft.manufactureDate }] : []),
@@ -105,13 +137,14 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                setZoomDraft(cloneAutoZoomSettings());
                 setDraft({
                   ...DEFAULT_FILTERS,
-                  eventTimeStart: '2024-07-25',
-                  eventTimeEnd: '2024-07-31',
-                })
-              }
+                  eventTimeStart: DEFAULT_DASHBOARD_START_DATE,
+                  eventTimeEnd: DEFAULT_DASHBOARD_END_DATE,
+                });
+              }}
               className="px-3 py-1.5 text-[11px] font-bold rounded-full border border-gray-800 bg-gray-950 text-white hover:text-white hover:border-gray-500"
             >
               Reset
@@ -202,13 +235,13 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             onToggle={(v:string) => toggle('retailerLocationTypes', v)} 
           />
           <FilterDetail 
-            title="EPC Product" 
+            title="Product" 
             options={filterOptions?.epcProducts || []} 
             selected={draft.epcProducts || []} 
             onToggle={(v:string) => toggle('epcProducts', v)} 
           />
           <FilterDetail 
-            title="EPC Company" 
+            title="Company" 
             options={filterOptions?.epcCompanies || []} 
             selected={draft.epcCompanies || []} 
             onToggle={(v:string) => toggle('epcCompanies', v)} 
@@ -226,7 +259,7 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             onToggle={(v:string) => toggle('deviceIds', v)} 
           />
           <FilterDetail
-            title="EPC Search"
+            title="Search"
             options={[]}
             selected={[draft.epcCode, draft.epcLot, draft.epcSerial]
               .filter((v) => v !== '' && v != null)
@@ -234,9 +267,9 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
             onToggle={() => {}}
           >
             <div className="space-y-4">
-              <SearchInput label="EPC Code" val={draft.epcCode} onChange={(v:string) => setVal('epcCode', v)} />
-              <SearchInput label="EPC Lot" type="number" val={draft.epcLot} onChange={(v:string) => setVal('epcLot', v === '' ? null : Number(v))} />
-              <SearchInput label="EPC Serial" type="number" val={draft.epcSerial} onChange={(v:string) => setVal('epcSerial', v === '' ? null : Number(v))} />
+              <SearchInput label="Code" val={draft.epcCode} onChange={(v:string) => setVal('epcCode', v)} />
+              <SearchInput label="Lot" type="number" val={draft.epcLot} onChange={(v:string) => setVal('epcLot', toNullableNumber(v))} />
+              <SearchInput label="Serial" type="number" val={draft.epcSerial} onChange={(v:string) => setVal('epcSerial', toNullableNumber(v))} />
             </div>
           </FilterDetail>
         </div>
@@ -245,6 +278,9 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
           <button
             onClick={() => {
               setFilters(draft);
+              if (setMapZoomSettings) {
+                setMapZoomSettings({ ...zoomDraft });
+              }
               onClose();
             }}
             className="w-full py-4 bg-gray-800 text-white rounded-2xl font-black hover:bg-gray-700 cursor-pointer transition-all"
@@ -257,24 +293,58 @@ export default function FilterPanel({ isOpen, onClose, filters, setFilters, filt
   );
 }
 
+type SearchInputProps = {
+  label: string;
+  val: string | number | null | undefined;
+  onChange: (value: string) => void;
+  type?: 'text' | 'number' | 'date';
+  step?: number;
+  min?: number;
+  max?: number;
+};
+
+type FilterOption = { key: string; value: string };
+
+type FilterDetailProps = {
+  title: string;
+  options?: FilterOption[];
+  selected?: Array<string | number | null | undefined>;
+  onToggle: (value: string) => void;
+  children?: ReactNode;
+};
+
+type DateInputProps = {
+  label: string;
+  val: string | null | undefined;
+  onChange: (value: string) => void;
+};
+
 // 서브 컴포넌트 (생략 가능: 이전 구현과 동일)
-function SearchInput({ label, val, onChange, type = 'text' }: any) {
+function SearchInput({ label, val, onChange, type = 'text', step, min, max }: SearchInputProps) {
   return (
     <div>
       <label className="block text-[10px] font-black text-white uppercase mb-1">{label}</label>
-      <input type={type} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white" value={val ?? ''} onChange={e => onChange(e.target.value)} />
+      <input
+        type={type}
+        step={step}
+        min={min}
+        max={max}
+        className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white"
+        value={val ?? ''}
+        onChange={e => onChange(e.target.value)}
+      />
     </div>
   );
 }
 
-function FilterDetail({ title, options, selected, onToggle, children }: any) {
+function FilterDetail({ title, options, selected, onToggle, children }: FilterDetailProps) {
   return (
     <details className="group bg-gray-950 rounded-2xl border border-gray-800 shadow-sm overflow-hidden">
       <summary className="cursor-pointer p-4 text-[11px] font-black text-white uppercase flex justify-between items-center list-none">
         {title} <span className="text-blue-500 font-bold">{selected?.length || 0}</span>
       </summary>
       <div className={`px-4 pb-4 ${children ? '' : 'flex flex-wrap gap-2'}`}>
-        {children || options?.map((opt: { key: string; value: string }) => (
+        {children || options?.map((opt) => (
           <button key={opt.key} onClick={() => onToggle(opt.key)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${selected?.includes(opt.key) ? 'bg-white text-gray-800 border-white' : 'bg-gray-950 text-white border-gray-800 hover:border-gray-500'}`}>
             {opt.value}
           </button>
@@ -284,7 +354,7 @@ function FilterDetail({ title, options, selected, onToggle, children }: any) {
   );
 }
 
-function DateInput({ label, val, onChange }: any) {
+function DateInput({ label, val, onChange }: DateInputProps) {
   return (
     <div>
       <label className="block text-[10px] font-black text-white uppercase mb-1">{label}</label>

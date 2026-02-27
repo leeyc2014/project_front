@@ -1,35 +1,21 @@
-﻿// app/anomaly-reports/page.tsx
-"use client";
+﻿"use client";
 
 import { EVENT_TYPE_LABELS } from "@/constants/eventType";
 import { convertMessage } from "@/utils/aiMessageUtil";
-import React, { useState, useEffect, useCallback } from "react";
+import { getAuthToken } from "@/utils/authToken";
+import { useState, useEffect, useCallback } from "react";
 import type { AnomalyReport, BadgeColor, FilterItem, FilterMaps, PageInfo } from "@/types/anomalyPage";
+import { LOCATION_TYPE_KO } from "@/constants/anomaly";
 
 /* ── 코드 → 한글 상수 맵 ────────────────────────────── */
-
-const LOCATION_TYPE_KO: Record<string, string> = {
-  Factory:        "공장",
-  Warehouse:      "창고",
-  LogisticCenter: "물류센터",
-  Saler:          "도매상",
-  Retailer:       "소매상",
-};
 
 function ko(map: Record<string, string>, code: string): string {
   return map[code] ?? code;
 }
 
 /* ── 유틸 ───────────────────────────────────────────── */
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-  if (match) return decodeURIComponent(match[1]);
-  return sessionStorage.getItem("token") || "";
-}
-
 function authHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${getToken()}` };
+  return { Authorization: `Bearer ${getAuthToken()}` };
 }
 
 function fmtDatetime(str: string): string {
@@ -275,7 +261,7 @@ export default function AnomalyReportsPage() {
     if (totalPages <= 1) return null;
     const maxBtn = 5;
     let start = Math.max(0, page - Math.floor(maxBtn / 2));
-    let end   = Math.min(totalPages - 1, start + maxBtn - 1);
+    const end = Math.min(totalPages - 1, start + maxBtn - 1);
     if (end - start < maxBtn - 1) start = Math.max(0, end - maxBtn + 1);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((i) => (
       <button

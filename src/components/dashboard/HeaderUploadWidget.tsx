@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CompleteSummary, LogisticsData, LogEntry } from "@/types/headerUploadWidget";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAtom } from "jotai";
 import { FaCloudUploadAlt } from "react-icons/fa";
 import { dashboardReloadTriggerAtom } from "@/atoms/atom";
 import { createPortal } from "react-dom"; 
+import { getAuthToken } from "@/utils/authToken";
 
 const DEFAULT_FILE_LABEL = "No file selected";
 
@@ -58,12 +59,11 @@ const readCompleteSummary = (payload: unknown): CompleteSummary | null => {
 };
 
 export default function HeaderUploadWidget() {
-  const router = useRouter();
   const pathname = usePathname();
 
   const [mounted, setMounted] = useState(false);
 
-  const [dashboardReloadTrigger, setDashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
+  const [, setDashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
 
   const [isVisible, setVisible] = useState<boolean>(false);
 
@@ -105,13 +105,6 @@ export default function HeaderUploadWidget() {
       }
     };
   }, []);
-
-  const getToken = () => {
-    if (typeof window === "undefined") return "";
-    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-    if (match) return decodeURIComponent(match[1]);
-    return sessionStorage.getItem("token") || "";
-  };
 
   const addLog = (msg: string) => {
     const time = new Date().toLocaleTimeString("ko-KR", { hour12: false });
@@ -204,7 +197,7 @@ export default function HeaderUploadWidget() {
     interruptionNotifiedRef.current = false;
     completeAlertedRef.current = false;
 
-    const token = getToken();
+    const token = getAuthToken();
     if (!token) {
       alert("로그인 토큰이 없습니다. 다시 로그인 해주세요.");
       setIsProcessing(false);
@@ -355,7 +348,7 @@ export default function HeaderUploadWidget() {
                 <button
                   type="button"
                   onClick={() => setIsLogModalOpen(true)}
-                  className={`w-27.5 rounded-md border border-red-500/70 bg-red-500/20 px-2 py-1 text-[10px] font-bold text-red-200 hover:bg-red -500/30 ${canOpenLogModal ? "" : "invisible pointer-events-none"
+                  className={`w-27.5 rounded-md border border-red-500/70 bg-red-500/20 px-2 py-1 text-[10px] font-bold text-red-200 hover:bg-red-500/30 ${canOpenLogModal ? "" : "invisible pointer-events-none"
                     }`}
                 >
                   로그 자세히 보기

@@ -2,21 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import type { EpcListResponse, EpcPageInfo, EpcRow, InitDataResponse, SelectOption } from "@/types/manage";
-
-type LotRelation = {
-  epcCompany: string;
-  epcProduct: string;
-  epcLot: string;
-  lotName: string;
-};
-
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-  if (match) return decodeURIComponent(match[1]);
-  return sessionStorage.getItem("token") || "";
-}
+import type { EpcListResponse, EpcPageInfo, EpcRow, InitDataResponse, SelectOption, LotRelation } from "@/types/manage";
+import { getAuthToken } from "@/utils/authToken";
 
 function toDisplay(value: unknown): string {
   if (value === null || value === undefined) return "-";
@@ -48,10 +35,6 @@ function getEpcCompany(row: EpcRow): unknown {
 
 function getEpcLot(row: EpcRow): unknown {
   return row.lot?.lotName ?? row.epc_lot ?? row.lot?.epcLot;
-}
-
-function getEpcHeader(row: EpcRow): unknown {
-  return row.epc_header ?? row.epcHeader;
 }
 
 function getEpcProduct(row: EpcRow): unknown {
@@ -142,7 +125,7 @@ export default function ManagePage() {
       const res = await fetch(`${base}/api/v1/epc?page=${pageNum}`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -231,7 +214,7 @@ export default function ManagePage() {
       const res = await fetch(`${base}/api/v1/dashboard/init-data`, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
         },
       });
 
@@ -378,7 +361,7 @@ export default function ManagePage() {
       const res = await fetch(`${base}/api/v1/epc/add`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${getAuthToken()}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -429,7 +412,7 @@ export default function ManagePage() {
     if (totalPages <= 1) return null;
     const maxBtn = 5;
     let start = Math.max(0, page - Math.floor(maxBtn / 2));
-    let end = Math.min(totalPages - 1, start + maxBtn - 1);
+    const end = Math.min(totalPages - 1, start + maxBtn - 1);
     if (end - start < maxBtn - 1) start = Math.max(0, end - maxBtn + 1);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((i) => (
       <button

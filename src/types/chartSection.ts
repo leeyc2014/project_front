@@ -1,4 +1,5 @@
 import type { DashboardResponse, RiskItem } from '@/types/dashboard';
+import type { RefObject } from 'react';
 
 export type ChartVariant = 'kpi' | 'hub' | 'eventType';
 export type HubDefectTab = 'error' | 'caution' | 'total';
@@ -20,6 +21,7 @@ export type TimelineModalProps = {
   onApplyEpcFilter?: (epcCode: string) => void;
   onClearEpcFilter?: () => void;
   isEpcFilterApplied?: boolean;
+  panelRef?: RefObject<HTMLDivElement | null>;
 };
 
 export type BarOptionsConfig = {

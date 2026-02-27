@@ -1,19 +1,13 @@
 ﻿'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { convertMessage } from '@/utils/aiMessageUtil';
 import { useAtom } from 'jotai';
 import { User } from '@/types/user';
 import { loginUserAtom } from '@/atoms/atom';
 import { EVENT_TYPE_LABELS } from '@/constants/eventType';
+import { getAuthToken } from '@/utils/authToken';
 import type { InspectionFormProps, ReportAnomalyByLocation, SerialListProps } from '@/types/serialList';
-
-function getToken(): string {
-  if (typeof window === 'undefined') return '';
-  const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-  if (match) return decodeURIComponent(match[1]);
-  return sessionStorage.getItem('token') || '';
-}
 
 function formatTimestamp6(date: Date): string {
   const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -26,7 +20,13 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
   anomalyByLocation,
   onClose,
 }) => {
-  const locationOptions = anomalyByLocation.length > 0 ? anomalyByLocation : [{ location: '-', messages: [{ text: '-', severity: 'NONE' as const, logisMoveId: null }] }];
+  const locationOptions = useMemo(
+    () =>
+      anomalyByLocation.length > 0
+        ? anomalyByLocation
+        : [{ location: '-', messages: [{ text: '-', severity: 'NONE' as const, logisMoveId: null }] }],
+    [anomalyByLocation]
+  );
   const [selectedLocation, setSelectedLocation] = useState(locationOptions[0].location);
   const selectedLocationItem =
     locationOptions.find((item) => item.location === selectedLocation) ?? locationOptions[0];
@@ -38,13 +38,13 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
   useEffect(() => {
     const nextLocation = locationOptions[0].location;
     setSelectedLocation(nextLocation);
-  }, [isOpen, anomalyByLocation]); // reopen 시 초기화
+  }, [isOpen, locationOptions]); // reopen 시 초기화
 
   useEffect(() => {
     const nextMessage =
       (locationOptions.find((item) => item.location === selectedLocation)?.messages || [])[0]?.text ?? '-';
     setSelectedMessage(nextMessage);
-  }, [selectedLocation, anomalyByLocation]); // 위치 변경 시 문구 초기화
+  }, [selectedLocation, locationOptions]); // 위치 변경 시 문구 초기화
 
   const selectedMessageObj =
     messageOptions.find((message) => message.text === selectedMessage) ?? messageOptions[0];
@@ -54,12 +54,11 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
       : selectedMessageObj.severity === 'CAUTION'
         ? 'border-yellow-700 bg-yellow-900/35 text-yellow-100'
         : 'border-gray-700 bg-gray-800 text-white';
-  useEffect(() => {
-    const defaultDetail = convertMessage(selectedMessageObj.text) || selectedMessageObj.text || '-';
-    setDetailMessage(`${defaultDetail}\n`);
-  }, [selectedLocation, selectedMessage, selectedMessageObj.text]);
+  const initialDetailMessage = `${selectedMessageObj.text || '-'}\n`;
 
-  const initialDetailMessage = messageOptions[0].text + '\n';
+  useEffect(() => {
+    setDetailMessage(initialDetailMessage);
+  }, [initialDetailMessage]);
 
   if (!isOpen) return null;
 
@@ -73,10 +72,10 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
     setIsSubmitting(true);
     try {
       const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
-      const token = getToken();
+      const token = getAuthToken();
       const payload = {
         logisMoveId: selectedMessageObj.logisMoveId,
-        detail: initialDetailMessage.replace(/\r?\n$/, '') || (convertMessage(selectedMessageObj.text) || selectedMessageObj.text),
+        detail: detailMessage.replace(/\r?\n$/, '') || (convertMessage(selectedMessageObj.text) || selectedMessageObj.text),
         result: '',
         completed: false,
         reportDate: formatTimestamp6(new Date()),
@@ -170,7 +169,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
             <textarea
               placeholder="공장 정보, 발생 시점 및 구체적인 상황을 입력하세요."
               className="min-h-24 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder:text-gray-400"
-              value={initialDetailMessage}
+              value={detailMessage}
               onChange={(e) => setDetailMessage(e.target.value)}
             />
           </div>
@@ -220,10 +219,6 @@ const SerialList: React.FC<SerialListProps> = ({
   useEffect(() => {
     setPageInput(String(safePage));
   }, [serials, safePage]);
-
-  useEffect(() => {
-    setPageInput(String(safePage));
-  }, [safePage]);
 
   const jumpToPage = () => {
     const next = Number.parseInt(pageInput, 10);
@@ -338,7 +333,9 @@ const SerialList: React.FC<SerialListProps> = ({
                               title={hasRule ? convertMessage(event.ruleCheck!) : hasAi ? convertMessage(event.aiCheck!) : ''}
                             >
                               <td className="p-2"><sup className="font-bold">{hasRule ? '위험' : hasAi ? '주의' : ''}</sup> {event.scanLocation ?? '-'}</td>
-                              <td className="p-2">{event.eventType ? EVENT_TYPE_LABELS[event.eventType] : '-'}</td>
+                              <td className="p-2">
+                                {event.eventType ? (EVENT_TYPE_LABELS[event.eventType] || event.eventType) : '-'}
+                              </td>
                               <td className="p-2 font-mono text-[10px] text-white">
                                 {toDateText(event.eventTime)}
                               </td>
@@ -396,10 +393,6 @@ const SerialList: React.FC<SerialListProps> = ({
               </div>
             );
           })}
-
-          {serials.length === 0 && (
-            <div className="p-6 text-center text-xs text-white">No serials found.</div>
-          )}
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-xs text-white">Serial list hidden.</div>

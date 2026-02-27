@@ -1,11 +1,13 @@
 ﻿"use client";
-import { useState, useEffect } from 'react';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import HeaderUploadWidget from '@/components/dashboard/HeaderUploadWidget';
 import { useAtom } from 'jotai';
 import { User } from '@/types/user';
 import { loginUserAtom } from '@/atoms/atom';
+import { DEFAULT_DASHBOARD_QUERY } from '@/constants/defaultDateRange';
 
 const Icon = ({ path, className }: { path: string; className: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
@@ -16,9 +18,6 @@ const Icon = ({ path, className }: { path: string; className: string }) => (
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [loginUser] = useAtom<User | null>(loginUserAtom);
 
-  const [selectedMenu, setSelectedMenu] = useState('dashboard');
-  const [displayName, setDisplayName] = useState('—');
-  const [isAuthorized, setIsAuthorized] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
   const isDashboardHome = pathname === '/dashboard';
@@ -26,7 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const menuItems = [
     {
       "key": "dashboard",
-      "url": '/dashboard?eventTimeStart=2024-07-25&eventTimeEnd=2024-07-31',
+      "url": `/dashboard?${DEFAULT_DASHBOARD_QUERY}`,
       "name": "대시보드",
       "admin_only": false
     },
@@ -65,40 +64,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const hasAuthToken = () => {
+    if (typeof window === 'undefined') return true;
     const hasCookieToken = document.cookie
       .split(';')
       .some((cookie) => cookie.trim().startsWith('token='));
     const hasSessionToken = Boolean(sessionStorage.getItem('token'));
     return hasCookieToken || hasSessionToken;
   };
+  const isAuthorized = hasAuthToken();
+  const selectedMenu = pathname.includes("/dashboard/report")
+    ? "report"
+    : pathname.includes("/dashboard/anomaly")
+    ? "anomaly"
+    : pathname.includes("/dashboard/members")
+    ? "members"
+    : pathname.includes("/dashboard/manage")
+    ? "manage"
+    : "dashboard";
+  const displayName = loginUser?.name || '—';
 
   useEffect(() => {
     if (!hasAuthToken()) {
-      setIsAuthorized(false);
       alert('로그인 이후 사용 가능합니다.');
       router.replace('/');
-      return;
     }
-    setIsAuthorized(true);
   }, [pathname, router]);
-
-  useEffect(() => {
-    if (pathname.includes("/dashboard/report")) {
-      setSelectedMenu("report");
-    } else if (pathname.includes("/dashboard/anomaly")) {
-      setSelectedMenu("anomaly");
-    } else if (pathname.includes("/dashboard/members")) {
-      setSelectedMenu("members");
-    } else if (pathname.includes("/dashboard/manage")) {
-      setSelectedMenu("manage");
-    } else {
-      setSelectedMenu("dashboard");
-    }
-  }, [pathname]); // pathname이 변할 때마다 즉각 실행
-
-  useEffect(() => {
-    setDisplayName(loginUser?.name || '—')
-  }, [loginUser]);
 
   const handleSignOut = () => {
     clearTokenCookie();
@@ -115,16 +105,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <header className="relative z-50 bg-gray-900 text-white shadow-lg flex-none">
         <div className="h-16 flex items-center justify-between px-8 border-b border-gray-800 relative z-20 bg-gray-900">
           <div className="flex items-center space-x-12 shrink-0">
-            <h1 className="text-xl font-black tracking-tighter text-blue-500 italic uppercase">LOGIFLOW</h1>
+            <h1 className="text-2xl font-black tracking-tighter text-blue-500 italic uppercase">LOGIFLOW</h1>
             <nav className="flex space-x-8 h-16">
               {
                 menuItems.map((item) => (
                   <div className={`h-16 flex items-center ${loginUser?.role !== 'ADMIN' && item.admin_only ? 'hidden' : ''}`} key={item.key}>
                     <Link
                       href={item.url}
-                      onClick={() => {
-                        setSelectedMenu(item.key);
-                      }}
                       className={`flex items-center font-bold px-1 transition-all ${selectedMenu === item.key
                           ? 'border-blue-500 text-blue-500'
                           : 'border-transparent text-gray-400 hover:text-white'

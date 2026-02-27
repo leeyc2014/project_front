@@ -1,8 +1,8 @@
-// app/period-ranges/page.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { PeriodRange, Product, RangeType } from "@/types/reportPage";
+import { getAuthToken } from "@/utils/authToken";
 
 /* ─── 유틸 ─────────────────────────────────────────── */
 
@@ -85,7 +85,7 @@ export default function PeriodRangePage() {
       try {
         const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
         const url = `${backendBaseUrl}/api/v1/dashboard/init-data`;
-        const token = getToken();
+        const token = getAuthToken();
         const authHeaders = { Authorization: `Bearer ${token}` };
 
         const res = await fetch(url, { headers: authHeaders });
@@ -122,13 +122,6 @@ export default function PeriodRangePage() {
     if (!isMounted) return [];
     return buildRanges(fromStr, toStr, today, rangeType);
   }, [fromStr, toStr, today, rangeType, isMounted]);
-
-  const getToken = () => {
-    if (typeof window === 'undefined') return '';
-    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-    if (match) return decodeURIComponent(match[1]);
-    return sessionStorage.getItem('token') || '';
-  };
 
   const dayCount = (r: PeriodRange) =>
     Math.round((r.to.getTime() - r.from.getTime()) / 86_400_000) + 1;

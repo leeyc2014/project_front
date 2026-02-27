@@ -1,15 +1,9 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { DEFAULT_DASHBOARD_END_DATE, DEFAULT_DASHBOARD_START_DATE } from '@/constants/defaultDateRange';
 
-type DateRangeQuickPickerProps = {
-  startDate: string;
-  endDate: string;
-  onApply: (nextStart: string, nextEnd: string) => void;
-  layout?: 'horizontal' | 'vertical';
-  inline?: boolean;
-  dropdownPosition?: 'relative' | 'absolute';
-};
+import type { DateRangeQuickPickerProps } from '@/types/datePicker';
 
 // 'start' | 'end' | null 에서, 첫 번째 클릭인지 두 번째 클릭인지 상태를 관리하기 위해 단순화
 type ActiveSide = 'start' | 'end' | null;
@@ -61,8 +55,8 @@ export default function DateRangeQuickPicker({
   dropdownPosition = 'relative',
 }: DateRangeQuickPickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const initialStart = startDate || '2024-07-25';
-  const initialEnd = endDate || '2024-07-31';
+  const initialStart = startDate || DEFAULT_DASHBOARD_START_DATE;
+  const initialEnd = endDate || DEFAULT_DASHBOARD_END_DATE;
 
   const [open, setOpen] = useState(false);
   const [draftStart, setDraftStart] = useState<string | null>(initialStart);
@@ -80,9 +74,9 @@ export default function DateRangeQuickPicker({
   // 모달이 열릴 때/닫힐 때 외부 Props에 맞춰 초기화
   useEffect(() => {
     if (!open) {
-      setDraftStart(startDate || '2024-07-25');
-      setDraftEnd(endDate || '2024-07-31');
-      setBaseMonth(startOfMonth(parseDateKey(startDate || '2024-07-25') ?? new Date()));
+      setDraftStart(startDate || DEFAULT_DASHBOARD_START_DATE);
+      setDraftEnd(endDate || DEFAULT_DASHBOARD_END_DATE);
+      setBaseMonth(startOfMonth(parseDateKey(startDate || DEFAULT_DASHBOARD_START_DATE) ?? new Date()));
       setActiveSide(null);
     }
   }, [open, startDate, endDate]);

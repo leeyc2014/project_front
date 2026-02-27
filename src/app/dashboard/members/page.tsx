@@ -1,21 +1,15 @@
 ﻿"use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAtom } from "jotai";
 import { loginUserAtom } from "@/atoms/atom";
+import { getAuthToken } from "@/utils/authToken";
 import type { User } from "@/types/user";
 import type { Member, EditForm, CreateForm, MemberListResponse, MemberPageInfo } from "@/types/members";
 
-function getToken(): string {
-  if (typeof window === "undefined") return "";
-  const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-  if (match) return decodeURIComponent(match[1]);
-  return sessionStorage.getItem("token") || "";
-}
-
 function authHeaders(): Record<string, string> {
-  return { Authorization: `Bearer ${getToken()}` };
+  return { Authorization: `Bearer ${getAuthToken()}` };
 }
 
 function enabledLabel(enabled: boolean): string {
@@ -220,7 +214,7 @@ export default function MembersPage() {
     if (totalPages <= 1) return null;
     const maxBtn = 5;
     let start = Math.max(0, page - Math.floor(maxBtn / 2));
-    let end = Math.min(totalPages - 1, start + maxBtn - 1);
+    const end = Math.min(totalPages - 1, start + maxBtn - 1);
     if (end - start < maxBtn - 1) start = Math.max(0, end - maxBtn + 1);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((i) => (
       <button

@@ -4,16 +4,19 @@ import { useState, useMemo, useRef, useLayoutEffect, useCallback, useEffect } fr
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useRawDashboardData } from '@/hooks/useRawDashboardData';
-import { DEFAULT_FILTERS, FilterState } from '@/types/dashboard';
+import { FilterState } from '@/types/dashboard';
+import { DEFAULT_FILTERS } from '@/constants/dashboard';
 import SerialList from '@/components/dashboard/SerialList';
 import FilterPanel from '@/components/dashboard/FilterPanel';
 import ChartSection, { EpcTimelineModal } from '@/components/dashboard/ChartSection';
 import DashboardLoadingOverlay from '@/components/dashboard/DashboardLoadingOverlay';
 import DateRangeQuickPicker from '@/components/dashboard/DateRangeQuickPicker';
-import type { RouteData } from '@/types/logisticsMap';
+import type { AutoZoomSettings,RouteData } from '@/types/logisticsMap';
+import { DEFAULT_AUTO_ZOOM_SETTINGS } from '@/constants/logisticsMap';
 import type { HubDefectTab } from '@/types/chartSection';
 import { useAtom } from 'jotai';
 import { dashboardReloadTriggerAtom } from '@/atoms/atom';
+import { getAuthToken } from '@/utils/authToken';
 
 const LogisticsMap = dynamic(() => import('@/components/dashboard/LogisticsMap'), {
   ssr: false,
@@ -28,6 +31,32 @@ const Section = ({ title, children, headerRight }: any) => (
     <div className="flex-1 p-4 relative min-h-0 overflow-hidden">{children}</div>
   </div>
 );
+
+const isSameStringArray = (a: string[], b: string[]) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+const isSameFilterState = (a: FilterState, b: FilterState) =>
+  isSameStringArray(a.factoryLocationTypes, b.factoryLocationTypes) &&
+  isSameStringArray(a.warehouseLocationTypes, b.warehouseLocationTypes) &&
+  isSameStringArray(a.logisticCenterLocationTypes, b.logisticCenterLocationTypes) &&
+  isSameStringArray(a.salerLocationTypes, b.salerLocationTypes) &&
+  isSameStringArray(a.retailerLocationTypes, b.retailerLocationTypes) &&
+  isSameStringArray(a.operatorIds, b.operatorIds) &&
+  isSameStringArray(a.deviceIds, b.deviceIds) &&
+  isSameStringArray(a.epcCompanies, b.epcCompanies) &&
+  isSameStringArray(a.epcProducts, b.epcProducts) &&
+  a.epcCode === b.epcCode &&
+  a.epcLot === b.epcLot &&
+  a.epcSerial === b.epcSerial &&
+  a.eventTimeStart === b.eventTimeStart &&
+  a.eventTimeEnd === b.eventTimeEnd &&
+  a.manufactureDate === b.manufactureDate &&
+  a.expiryDate === b.expiryDate;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -88,8 +117,8 @@ export default function DashboardPage() {
 
     const toCoords = (loc: any): [number, number] | null => {
       if (!loc) return null;
-      const a = Number(loc?.longtitude ?? loc?.longitude ?? loc?.lat);
-      const b = Number(loc?.latitude ?? loc?.lat ?? loc?.lng);
+      const a = Number(loc?.longtitude ?? loc?.longitude ?? loc?.lng);
+      const b = Number(loc?.latitude ?? loc?.lat);
       if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
       if (Math.abs(a) <= 90 && Math.abs(b) > 90) {
         return [b, a];
@@ -142,21 +171,28 @@ export default function DashboardPage() {
 
   const filteredEvents = useMemo(() => {
     const normalizeDate = (value: string) => (value || '').slice(0, 10);
-    return mergedEvents.filter((e) => {
-      const locationFilters = [
-        ...(filters.factoryLocationTypes || []),
-        ...(filters.logisticCenterLocationTypes || []),
-        ...(filters.salerLocationTypes || []),
-        ...(filters.retailerLocationTypes || []),
-      ];
+    const locationFilters = [
+      ...(filters.factoryLocationTypes || []),
+      ...(filters.warehouseLocationTypes || []),
+      ...(filters.logisticCenterLocationTypes || []),
+      ...(filters.salerLocationTypes || []),
+      ...(filters.retailerLocationTypes || []),
+    ];
+    const locationFilterSet = new Set(locationFilters);
+    const operatorSet = new Set(filters.operatorIds || []);
+    const deviceSet = new Set(filters.deviceIds || []);
+    const companySet = new Set(filters.epcCompanies || []);
+    const productSet = new Set(filters.epcProducts || []);
+    const epcCodeKeyword = (filters.epcCode || '').toLowerCase();
 
-      if (locationFilters.length && e.locationId && !locationFilters.includes(e.locationId)) return false;
-      if ((filters.operatorIds?.length ?? 0) > 0 && e.operatorId && !filters.operatorIds.includes(e.operatorId)) return false;
-      if ((filters.deviceIds?.length ?? 0) > 0 && e.deviceId && !filters.deviceIds.includes(e.deviceId)) return false;
-      if ((filters.epcCompanies?.length ?? 0) > 0 && e.epcCompany && !filters.epcCompanies.includes(e.epcCompany)) return false;
-      if ((filters.epcProducts?.length ?? 0) > 0 && e.epcProduct && !filters.epcProducts.includes(e.epcProduct)) return false;
+    return mergedEvents.filter((e) => {
+      if (locationFilterSet.size > 0 && e.locationId && !locationFilterSet.has(e.locationId)) return false;
+      if (operatorSet.size > 0 && e.operatorId && !operatorSet.has(e.operatorId)) return false;
+      if (deviceSet.size > 0 && e.deviceId && !deviceSet.has(e.deviceId)) return false;
+      if (companySet.size > 0 && e.epcCompany && !companySet.has(e.epcCompany)) return false;
+      if (productSet.size > 0 && e.epcProduct && !productSet.has(e.epcProduct)) return false;
       if (status !== 'ALL' && e.st !== status) return false;
-      if (filters.epcCode && !e.epcCode.toLowerCase().includes(filters.epcCode.toLowerCase())) return false;
+      if (epcCodeKeyword && !e.epcCode.toLowerCase().includes(epcCodeKeyword)) return false;
       if (filters.epcLot != null && e.epcLot !== filters.epcLot) return false;
       if (filters.epcSerial != null && e.epcSerial !== filters.epcSerial) return false;
       const eventDate = normalizeDate(e.eventTime);
@@ -174,32 +210,26 @@ export default function DashboardPage() {
   const [isPatternAnimationEnabled, setIsPatternAnimationEnabled] = useState(false);
   const [resetToken, setResetToken] = useState(0); // 원본 resetToken 복구 [cite: 179]
   const [mapPadding, setMapPadding] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
+  const [mapAutoZoomSettings, setMapAutoZoomSettings] = useState<AutoZoomSettings>(DEFAULT_AUTO_ZOOM_SETTINGS);
+  const [timelineAutoZoomNonce, setTimelineAutoZoomNonce] = useState(0);
+  const [timelineAutoZoomSerial, setTimelineAutoZoomSerial] = useState<string | null>(null);
   const [serialPhase, setSerialPhase] = useState<'shown' | 'hidden' | 'enter' | 'leave'>('shown');
   const [chartsPhase, setChartsPhase] = useState<'shown' | 'hidden' | 'enter' | 'leave'>('shown');
   const serialTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chartsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChartRequestKeyRef = useRef<string>('');
   const chartRequestIdRef = useRef(0);
-  const [dashboardReloadTrigger, setDashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
+  const [dashboardReloadTrigger] = useAtom<number>(dashboardReloadTriggerAtom);
 
   const mapWrapRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const bottomChartsRef = useRef<HTMLDivElement>(null);
+  const timelinePanelRef = useRef<HTMLDivElement>(null);
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
-
-
-
-  const getToken = () => {
-    if (typeof window === 'undefined') return '';
-    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-    if (match) return decodeURIComponent(match[1]);
-    return sessionStorage.getItem('token') || '';
-  };
-
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    setFilters({
+    const nextFilters: FilterState = {
       factoryLocationTypes: parseIds(params.get('factoryLocations')),
       warehouseLocationTypes: parseIds(params.get('warehouseLocations')),
       logisticCenterLocationTypes: parseIds(params.get('logisticCenterLocations')),
@@ -216,7 +246,8 @@ export default function DashboardPage() {
       eventTimeEnd: params.get('eventTimeEnd') || '',
       manufactureDate: params.get('manufactureDate') || '',
       expiryDate: params.get('expiryDate') || '',
-    });
+    };
+    setFilters((prev) => (isSameFilterState(prev, nextFilters) ? prev : nextFilters));
   }, [searchParams]);
 
   useEffect(() => {
@@ -273,7 +304,7 @@ export default function DashboardPage() {
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           if (controller.signal.aborted) return;
 
-          const token = getToken();
+          const token = getAuthToken();
           if (!token) {
             await wait(250);
             continue;
@@ -323,11 +354,13 @@ export default function DashboardPage() {
 
     fetchCharts();
     return () => controller.abort();
-  }, [backendBaseUrl, filters, status, dashboardReloadTrigger]);
+  }, [backendBaseUrl, filters, dashboardReloadTrigger]);
 
   // RESET MAP 기능 (원본 로직 반영) [cite: 270, 272]
   const handleResetMap = useCallback(() => {
     setActiveSerial(null);
+    setTimelineAutoZoomNonce(0);
+    setTimelineAutoZoomSerial(null);
     setResetToken((prev) => prev + 1);
   }, []);
 
@@ -337,15 +370,19 @@ export default function DashboardPage() {
     const left = leftPanelRef.current?.getBoundingClientRect();
     const right = rightPanelRef.current?.getBoundingClientRect();
     const bottom = bottomChartsRef.current?.getBoundingClientRect();
+    const timeline = timelinePanelRef.current?.getBoundingClientRect();
     const serialInLayout = serialPhase !== 'hidden';
     const chartsInLayout = chartsPhase !== 'hidden';
+    const timelineInLayout = serialInLayout && timelineOpen && Boolean(activeSerial) && Boolean(timeline);
+    const rightBySerialList = serialInLayout && right ? Math.max(0, rect.right - right.left) : 0;
+    const rightByTimeline = timelineInLayout && timeline ? Math.max(0, rect.right - timeline.left) : 0;
     setMapPadding({
       top: 0,
       left: left ? left.right - rect.left : 0,
-      right: serialInLayout && right ? rect.right - right.left : 0,
+      right: Math.max(rightBySerialList, rightByTimeline),
       bottom: chartsInLayout && bottom ? rect.bottom - bottom.top : 0,
     });
-  }, [serialPhase, chartsPhase]);
+  }, [activeSerial, chartsPhase, serialPhase, timelineOpen]);
 
   useLayoutEffect(() => {
     computeMapPadding();
@@ -419,6 +456,16 @@ export default function DashboardPage() {
     return Array.from(selected).sort();
   }, [filteredEvents]);
 
+  const autoFocusSerialKey = useMemo(() => {
+    if (timelineAutoZoomNonce <= 0) return null;
+    const requestedSerial = String(timelineAutoZoomSerial || '').trim();
+    if (!requestedSerial) return null;
+    if (serials.length !== 1) return null;
+    const currentSerial = String(serials[0] || '').trim();
+    if (!currentSerial || currentSerial !== requestedSerial) return null;
+    return `${currentSerial}|${timelineAutoZoomNonce}`;
+  }, [serials, timelineAutoZoomNonce, timelineAutoZoomSerial]);
+
   const eventsBySerial = useMemo(() => {
     const map: Record<string, any[]> = {};
     serials.forEach((serial) => {
@@ -429,6 +476,8 @@ export default function DashboardPage() {
   const isMapPending = isLoading || isChartLoading;
 
   const handlePageChange = useCallback((nextPage: number) => {
+    setTimelineAutoZoomNonce(0);
+    setTimelineAutoZoomSerial(null);
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', String(Math.max(0, nextPage)));
     params.delete('size');
@@ -438,6 +487,8 @@ export default function DashboardPage() {
 
   const handleStatusChange = useCallback((nextStatus: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER') => {
     setTimelineOpen(false);
+    setTimelineAutoZoomNonce(0);
+    setTimelineAutoZoomSerial(null);
 
     const current = new URLSearchParams(searchParams.toString());
     const params = new URLSearchParams();
@@ -455,6 +506,9 @@ export default function DashboardPage() {
 
   const handleRouteLocationSelect = useCallback((fromLocationId: string, toLocationId: string) => {
     setTimelineOpen(false);
+    setTimelineAutoZoomNonce(0);
+    setTimelineAutoZoomSerial(null);
+    setResetToken((prev) => prev + 1);
 
     const normalizeId = (value: string) => String(value || '').trim();
     const routeLocationIds = Array.from(
@@ -534,26 +588,13 @@ export default function DashboardPage() {
       else params.delete(key);
     };
 
-    const current = new URLSearchParams(searchParams.toString());
     const params = new URLSearchParams();
-    for (const [key, value] of current.entries()) {
-      if (
-        key === 'status' ||
-        key === 'st' ||
-        key === 'page' ||
-        key === 'size' ||
-        key === 'factoryLocations' ||
-        key === 'warehouseLocations' ||
-        key === 'logisticCenterLocations' ||
-        key === 'salerLocations' ||
-        key === 'retailerLocations'
-      ) {
-        continue;
-      }
-      params.set(key, value);
-    }
-
+    // Map route/node selection should reset non-location filters, but keep date filters.
     params.set('page', '0');
+    setOrDelete(params, 'eventTimeStart', filters.eventTimeStart || '');
+    setOrDelete(params, 'eventTimeEnd', filters.eventTimeEnd || '');
+    setOrDelete(params, 'manufactureDate', filters.manufactureDate || '');
+    setOrDelete(params, 'expiryDate', filters.expiryDate || '');
     setOrDelete(params, 'factoryLocations', toCsv(grouped.factoryLocationTypes));
     setOrDelete(params, 'warehouseLocations', toCsv(grouped.warehouseLocationTypes));
     setOrDelete(params, 'logisticCenterLocations', toCsv(grouped.logisticCenterLocationTypes));
@@ -561,7 +602,7 @@ export default function DashboardPage() {
     setOrDelete(params, 'retailerLocations', toCsv(grouped.retailerLocationTypes));
 
     router.push(`/dashboard?${params.toString()}`);
-  }, [filterOptions, locationList, router, searchParams]);
+  }, [filterOptions, filters.eventTimeEnd, filters.eventTimeStart, filters.expiryDate, filters.manufactureDate, locationList, router]);
 
   const handleHubLocationSelect = useCallback((locationId: string) => {
     handleRouteLocationSelect(locationId, locationId);
@@ -569,6 +610,8 @@ export default function DashboardPage() {
 
   const handleApplyFilters = useCallback((nextFilters: FilterState) => {
     setTimelineOpen(false);
+    setTimelineAutoZoomNonce(0);
+    setTimelineAutoZoomSerial(null);
     setFilters(nextFilters);
 
     const toCsv = (list: string[] | undefined) => {
@@ -623,6 +666,8 @@ export default function DashboardPage() {
     const value = (epcCode || '').trim();
     if (!value) return;
     setIsChartLoading(true);
+    setTimelineAutoZoomSerial(value);
+    setTimelineAutoZoomNonce((prev) => prev + 1);
 
     const params = new URLSearchParams(searchParams.toString());
     params.set('epcCode', value);
@@ -638,6 +683,8 @@ export default function DashboardPage() {
 
   const handleClearSerialEpcFilter = useCallback(() => {
     setIsChartLoading(true);
+    setTimelineAutoZoomNonce(0);
+    setTimelineAutoZoomSerial(null);
     const params = new URLSearchParams(searchParams.toString());
     params.delete('epcCode');
     params.set('page', '0');
@@ -653,6 +700,8 @@ export default function DashboardPage() {
       const nextFilters = { ...filters, eventTimeStart: nextStart, eventTimeEnd: nextEnd };
       setFilters(nextFilters);
       setTimelineOpen(false);
+      setTimelineAutoZoomNonce(0);
+      setTimelineAutoZoomSerial(null);
 
       const params = new URLSearchParams(searchParams.toString());
       const setOrDelete = (paramKey: 'eventTimeStart' | 'eventTimeEnd', paramValue: string) => {
@@ -678,10 +727,11 @@ export default function DashboardPage() {
     <div className="relative h-full w-full overflow-hidden bg-gray-100" ref={mapWrapRef}>
       <div className="absolute inset-0">
         <LogisticsMap
-          epcFilter={mapRoutes.length > 0 ? null : (activeSerial ? [activeSerial] : serials)}
           routes={isMapPending ? [] : (mapRoutes.length > 0 ? mapRoutes : [])}
           resetToken={resetToken}
           viewportPadding={mapPadding}
+          autoFocusKey={autoFocusSerialKey}
+          autoZoomSettings={mapAutoZoomSettings}
           onRouteLocationSelect={handleRouteLocationSelect}
           patternAnimationEnabled={isPatternAnimationEnabled}
         />
@@ -867,6 +917,8 @@ export default function DashboardPage() {
         onClose={() => setIsFilterOpen(false)}
         filters={filters}
         setFilters={handleApplyFilters}
+        mapZoomSettings={mapAutoZoomSettings}
+        setMapZoomSettings={setMapAutoZoomSettings}
         filterOptions={filterOptions}
       />
       <EpcTimelineModal
@@ -877,6 +929,7 @@ export default function DashboardPage() {
         onApplyEpcFilter={handleApplySerialEpcFilter}
         onClearEpcFilter={handleClearSerialEpcFilter}
         isEpcFilterApplied={Boolean((searchParams.get('epcCode') || '').trim())}
+        panelRef={timelinePanelRef}
       />
       {isMapPending && <DashboardLoadingOverlay />}
     </div>

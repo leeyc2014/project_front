@@ -64,3 +64,10 @@ export type InitDataResponse = {
   filters?: Record<string, unknown>;
   [key: string]: unknown;
 };
+
+export type LotRelation = {
+  epcCompany: string;
+  epcProduct: string;
+  epcLot: string;
+  lotName: string;
+};

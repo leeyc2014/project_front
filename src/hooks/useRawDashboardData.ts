@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FilterOptions, RiskItem, FilterState } from '@/types/dashboard';
 import type { LocationItem } from '@/types/useRawDashboardData';
+import { getAuthToken } from '@/utils/authToken';
 
 export function useRawDashboardData(
   page?: number,
@@ -24,16 +25,8 @@ export function useRawDashboardData(
   });
   const [locationList, setLocationList] = useState<LocationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const lastDeniedListRequestRef = useRef<string>('');
 
   const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
-
-  const getToken = () => {
-    if (typeof window === 'undefined') return '';
-    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-    if (match) return decodeURIComponent(match[1]);
-    return sessionStorage.getItem('token') || '';
-  };
 
   const normalizeBackendEvent = useCallback((raw: any): RiskItem[] => {
     const safe = (v: any) => v == null ? '' : String(v).trim();
@@ -165,7 +158,6 @@ export function useRawDashboardData(
         const setIfPresent = (params: URLSearchParams, key: string, value: string) => {
           if (value) params.set(key, value);
         };
-
         const query = new URLSearchParams();
 
         if (status !== 'ALL') {
@@ -201,38 +193,76 @@ export function useRawDashboardData(
           : `${backendBaseUrl}/api/v1/logis-move/totallist`;
 
         const maxAttempts = 40;
+        const retryDeadline = Date.now() + 12_000;
         let evtRes: any = null;
-        let deniedToken: string | null = null;
+        let lastToken = '';
+        let authRetryCount = 0;
+        let forbiddenRetryCount = 0;
+        let transientRetryCount = 0;
+
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           if (controller.signal.aborted) return;
-          const token = getToken();
+          if (Date.now() >= retryDeadline) break;
+
+          const token = getAuthToken();
           if (!token) {
             await wait(250);
             continue;
           }
-          const deniedKey = `${listUrl}|${token}`;
-          if (lastDeniedListRequestRef.current === deniedKey) {
-            break;
+
+          if (token !== lastToken) {
+            lastToken = token;
+            authRetryCount = 0;
+            forbiddenRetryCount = 0;
           }
 
-          const res = await fetch(listUrl, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}` },
-            signal: controller.signal,
-          });
+          let res: Response;
+          try {
+            res = await fetch(listUrl, {
+              method: 'GET',
+              headers: { Authorization: `Bearer ${token}` },
+              signal: controller.signal,
+            });
+          } catch (error) {
+            if (controller.signal.aborted) return;
+            transientRetryCount += 1;
+            if (transientRetryCount >= 4 || Date.now() >= retryDeadline) {
+              throw error;
+            }
+            await wait(300 * transientRetryCount);
+            continue;
+          }
 
-          if (res.status === 401 || res.status === 403) {
+          if (res.status === 401) {
             await res.text();
-            lastDeniedListRequestRef.current = deniedKey;
-            if (deniedToken && deniedToken === token) {
+            authRetryCount += 1;
+            if (authRetryCount >= 6 || Date.now() >= retryDeadline) {
               break;
             }
-            deniedToken = token;
             await wait(300);
             continue;
           }
 
-          lastDeniedListRequestRef.current = '';
+          if (res.status === 403) {
+            await res.text();
+            forbiddenRetryCount += 1;
+            if (forbiddenRetryCount >= 2 || Date.now() >= retryDeadline) {
+              break;
+            }
+            await wait(350);
+            continue;
+          }
+
+          if (res.status === 408 || res.status === 429 || res.status >= 500) {
+            await res.text();
+            transientRetryCount += 1;
+            if (transientRetryCount >= 4 || Date.now() >= retryDeadline) {
+              break;
+            }
+            await wait(300 * transientRetryCount);
+            continue;
+          }
+
           evtRes = await safeJson(res, listUrl);
           break;
         }
@@ -314,7 +344,7 @@ export function useRawDashboardData(
 
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           if (controller.signal.aborted) return;
-          const token = getToken();
+          const token = getAuthToken();
           if (!token) {
             await wait(300);
             continue;

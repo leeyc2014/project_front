@@ -1,4 +1,4 @@
-// src/types/dashboard.ts
+import type { AutoZoomSettings } from '@/types/logisticsMap';
 
 // 지도 경로의 각 지점에 대한 인터페이스
 export interface PathPoint {
@@ -101,21 +101,12 @@ export type FilterOptions = {
   epcProducts: { key: string; value: string }[];
 };
 
-export const DEFAULT_FILTERS: FilterState = {
-  factoryLocationTypes: [],
-  warehouseLocationTypes: [],
-  logisticCenterLocationTypes: [],
-  salerLocationTypes: [],
-  retailerLocationTypes: [],
-  operatorIds: [],
-  deviceIds: [],
-  epcCompanies: [],
-  epcProducts: [],
-  epcCode: '',
-  epcLot: null,
-  epcSerial: null,
-  eventTimeStart: '',
-  eventTimeEnd: '',
-  manufactureDate: '',
-  expiryDate: '',
+export type FilterPanelProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  filters: FilterState;
+  setFilters: (nextFilters: FilterState) => void;
+  mapZoomSettings?: AutoZoomSettings;
+  setMapZoomSettings?: (nextSettings: AutoZoomSettings) => void;
+  filterOptions: FilterOptions;
 };
