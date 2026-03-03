@@ -190,7 +190,10 @@ export default function DashboardPage() {
       if (operatorSet.size > 0 && e.operatorId && !operatorSet.has(e.operatorId)) return false;
       if (deviceSet.size > 0 && e.deviceId && !deviceSet.has(e.deviceId)) return false;
       if (companySet.size > 0 && e.epcCompany && !companySet.has(e.epcCompany)) return false;
-      if (productSet.size > 0 && e.epcProduct && !productSet.has(e.epcProduct)) return false;
+      if (productSet.size > 0) {
+        const productId = String(e.productId ?? '').trim();
+        if (!productId || !productSet.has(productId)) return false;
+      }
       if (status !== 'ALL' && e.st !== status) return false;
       if (epcCodeKeyword && !e.epcCode.toLowerCase().includes(epcCodeKeyword)) return false;
       if (filters.epcLot != null && e.epcLot !== filters.epcLot) return false;

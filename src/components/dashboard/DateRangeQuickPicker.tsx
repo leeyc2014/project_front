@@ -97,7 +97,6 @@ export default function DateRangeQuickPicker({
   const rightCells = useMemo(() => buildMonthCells(rightMonth), [rightMonth]);
 
   const startObj = parseDateKey(draftStart);
-  const endObj = parseDateKey(draftEnd);
 
   // 1개월 이내 기간 제약 로직은 유지
   const activeConstraint = useMemo(() => {

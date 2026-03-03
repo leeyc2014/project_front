@@ -16,6 +16,31 @@ const STATUS_LABELS: Record<string, string> = {
   impossibleSpeed: '불가능한 이동 속도',
 };
 
+function asArray<T = any>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asObject(value: unknown): Record<string, any> {
+  return value && typeof value === "object" ? (value as Record<string, any>) : {};
+}
+
+async function safeJson(res: Response): Promise<any> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function parseEpcCodeParts(value: unknown): number[] {
+  if (typeof value !== "string") return [];
+  const parts = value.split(".");
+  if (parts.length < 6) return [];
+  const numbers = parts.map((part) => Number(part));
+  if (numbers.some((num) => !Number.isFinite(num))) return [];
+  return numbers;
+}
+
 function PrintReportContent() {
   const searchParams = useSearchParams();
   const fromDate = searchParams.get("from") || "";
@@ -54,13 +79,23 @@ function PrintReportContent() {
           fetch(`${backendBaseUrl}/api/v1/logis-error?products=${productId}&eventTimeStart=${fromDate}&eventTimeEnd=${toDate}&size=999999`, { headers: authHeaders }),
         ]);
 
-        const initData = await initRes.json();
-        const chartData = await chartRes.json();
-        const listData = await listRes.json();
-        const logisErrorData = await logisErrorRes.json();
+        const [initDataRaw, chartDataRaw, listDataRaw, logisErrorRaw] = await Promise.all([
+          safeJson(initRes),
+          safeJson(chartRes),
+          safeJson(listRes),
+          safeJson(logisErrorRes),
+        ]);
+        const initData = asObject(initDataRaw);
+        const chartData = asObject(chartDataRaw);
+        const listData = asObject(listDataRaw);
+        const initFilters = asObject(initData.filters);
+        const productList = asArray<any>(initFilters.productList);
+        const locationList = asArray<any>(initData.locationList);
+        const contents = Array.isArray(listDataRaw)
+          ? (listDataRaw as any[])
+          : asArray<any>(listData.content);
 
         if (productId) {
-          const productList = initData.filters?.productList || [];
           const matchedProduct = productList.find((p: any) => String(p.id) === String(productId));
           setProductName(matchedProduct ? matchedProduct.label : `알 수 없는 제품(${productId})`);
         } else {
@@ -69,7 +104,6 @@ function PrintReportContent() {
 
         // 1. 종합 요약 계산 (3 API 기준)
         let safe = 0, caution = 0, danger = 0;
-        const contents = listData.content || [];
         contents.forEach((item: any) => {
           if (item.checkResult === "SAFE") safe++;
           else if (item.checkResult === "CAUTION") caution++;
@@ -79,13 +113,13 @@ function PrintReportContent() {
         setSummary({ total: contents.length, safe, caution, danger });
 
         // 2. 유형별 진단 (2 API - kpi)
-        setKpiList(chartData.kpi || []);
+        setKpiList(asArray<any>(chartData.kpi));
 
         // 3. 허브별 진단 (1 API locationList + 2 API hubStatsList)
         const locationMap = new Map(
-          (initData.locationList || []).map((loc: any) => [loc.locationId, loc.locationName])
+          locationList.map((loc: any) => [loc?.locationId, loc?.locationName])
         );
-        const mappedHubStats = (chartData.hubStatsList || []).map((hub: any) => ({
+        const mappedHubStats = asArray<any>(chartData.hubStatsList).map((hub: any) => ({
           name: locationMap.get(hub.locationId) || `알 수 없는 허브(${hub.locationId})`,
           total: hub.count,
           caution: hub.cautionCount,
@@ -96,7 +130,7 @@ function PrintReportContent() {
 
         // 4. 스텝별 진단 (2 API - eventTypeStatsList)
         // EVENT_TYPE_LABELS 순서대로 정렬하기 위해 Map 활용
-        const stepMap = new Map<string, any>((chartData.eventTypeStatsList || []).map((step: any) => [step.eventType, step]));
+        const stepMap = new Map<string, any>(asArray<any>(chartData.eventTypeStatsList).map((step: any) => [step.eventType, step]));
 
         const orderedStepStats = Object.keys(EVENT_TYPE_LABELS).map(key => {
           const step = stepMap.get(key);
@@ -124,24 +158,29 @@ function PrintReportContent() {
         setDangerList(dList);
         setCautionList(cList);
 
-        const productList = initData.filters?.productList;
-        const locationList = initData.locationList;
-        
-        logisErrorData.forEach((item:any)=>{
-          const epcCodeSpl = item.epcCode.split(".").map((t:string)=>Number(t));
+        const rawErrorList = Array.isArray(logisErrorRaw)
+          ? logisErrorRaw
+          : asArray<any>(asObject(logisErrorRaw).content);
+        const normalizedErrorList = rawErrorList.map((entry: any) => {
+          const item = entry && typeof entry === "object" ? { ...entry } : {};
+          const epcCodeSpl = parseEpcCodeParts((item as any).epcCode);
 
-          item.epcHeader = epcCodeSpl[0];
-          item.epcCompany = epcCodeSpl[1];
-          item.epcProduct = epcCodeSpl[2];
-          item.epcLot = epcCodeSpl[3];
-          item.epcManufacture = epcCodeSpl[4];
-          item.epcSerial = epcCodeSpl[5];
+          if (epcCodeSpl.length >= 6) {
+            item.epcHeader = epcCodeSpl[0];
+            item.epcCompany = epcCodeSpl[1];
+            item.epcProduct = epcCodeSpl[2];
+            item.epcLot = epcCodeSpl[3];
+            item.epcManufacture = epcCodeSpl[4];
+            item.epcSerial = epcCodeSpl[5];
+          }
 
-          item.productName = productList.find((p: any) => p.id === item.epcProduct)?.label;
-
-          item.locationName = locationList.find((l:any)=>l.locationId === item.locationId)?.locationName;
-        })
-        setErrorList(logisErrorData);
+          item.productName =
+            productList.find((p: any) => p?.id === item.epcProduct)?.label ?? item.productName;
+          item.locationName =
+            locationList.find((l:any)=>l?.locationId === item.locationId)?.locationName ?? item.locationName;
+          return item;
+        });
+        setErrorList(normalizedErrorList);
 
       } catch (error) {
         console.error("데이터 로딩 중 오류 발생:", error);
@@ -164,7 +203,12 @@ function PrintReportContent() {
   };
 
   const renderDetails = (item: any, type: "DANGER" | "CAUTION" | "ERROR") => {
-    const firstDetail = type === "ERROR" ? item : item.details && item.details[0] ? item.details[0] : {};
+    const details = type === "ERROR"
+      ? [item]
+      : Array.isArray(item?.details)
+        ? item.details
+        : [];
+    const firstDetail = details[0] ?? {};
 
     return (
       <div key={item.epcCode} className="mb-4 last:mb-0">
@@ -172,7 +216,7 @@ function PrintReportContent() {
           {item.productName} (LOT: {firstDetail.epcLot}, SERIAL: {firstDetail.epcSerial}) <span className="text-xs font-normal">- EPC: {item.epcCode}</span>
         </p>
         <ul className="list-disc pl-5 mt-1 text-gray-700">
-          {(type === "ERROR" ? [item] : item.details).map((detail: any, idx: number) => {
+          {details.map((detail: any, idx: number) => {
             if (type === "DANGER" && detail.ruleCheck) {
               return (
                 <li key={idx}>

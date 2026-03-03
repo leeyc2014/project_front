@@ -12,6 +12,7 @@ export interface PathPoint {
 export interface RiskItem {
   id: string; // 로컬 식별용
   logisMoveId?: number | null;
+  productId?: string;
   epcCode: string;
   scanLocation: string;
   locationId: string;

@@ -23,6 +23,133 @@ function fmtDatetime(str: string): string {
   return str.replace("T", " ").substring(0, 16);
 }
 
+function toSafeNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toSafeString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return fallback;
+  return String(value);
+}
+
+function toNullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function normalizeAnomalyReport(raw: unknown): AnomalyReport {
+  const report = raw && typeof raw === "object" ? (raw as Record<string, any>) : {};
+  const move = report.logisMove && typeof report.logisMove === "object"
+    ? (report.logisMove as Record<string, any>)
+    : {};
+  const location = move.location && typeof move.location === "object"
+    ? (move.location as Record<string, any>)
+    : {};
+  const operator = move.operator && typeof move.operator === "object"
+    ? (move.operator as Record<string, any>)
+    : {};
+  const operatorLocation = operator.location && typeof operator.location === "object"
+    ? (operator.location as Record<string, any>)
+    : {};
+  const device = move.device && typeof move.device === "object"
+    ? (move.device as Record<string, any>)
+    : {};
+  const deviceLocation = device.location && typeof device.location === "object"
+    ? (device.location as Record<string, any>)
+    : {};
+  const epc = move.epc && typeof move.epc === "object"
+    ? (move.epc as Record<string, any>)
+    : {};
+  const company = epc.company && typeof epc.company === "object"
+    ? (epc.company as Record<string, any>)
+    : {};
+  const product = epc.product && typeof epc.product === "object"
+    ? (epc.product as Record<string, any>)
+    : {};
+  const productCompany = product.company && typeof product.company === "object"
+    ? (product.company as Record<string, any>)
+    : {};
+  const lot = epc.lot && typeof epc.lot === "object"
+    ? (epc.lot as Record<string, any>)
+    : {};
+
+  return {
+    id: toSafeNumber(report.id),
+    detail: toSafeString(report.detail),
+    result: toSafeString(report.result),
+    reportDate: toSafeString(report.reportDate),
+    completed: Boolean(report.completed),
+    logisMove: {
+      id: toSafeNumber(move.id),
+      hubType: toSafeString(move.hubType),
+      businessStep: toSafeString(move.businessStep),
+      eventType: toSafeString(move.eventType),
+      eventTime: toSafeString(move.eventTime),
+      aiCheck: toNullableString(move.aiCheck),
+      ruleCheck: toNullableString(move.ruleCheck),
+      epcCode: toSafeString(move.epcCode),
+      operatorId: toSafeNumber(move.operatorId ?? operator.operatorId),
+      deviceId: toSafeNumber(move.deviceId ?? device.deviceId),
+      locationId: toSafeNumber(move.locationId ?? location.locationId),
+      location: {
+        locationId: toSafeNumber(location.locationId ?? move.locationId),
+        locationName: toSafeString(location.locationName),
+        initial: toSafeString(location.initial),
+        longtitude: toSafeNumber(location.longtitude),
+        latitude: toSafeNumber(location.latitude),
+        type: toSafeString(location.type),
+      },
+      operator: {
+        operatorId: toSafeNumber(operator.operatorId ?? move.operatorId),
+        operatorName: toSafeString(operator.operatorName),
+        location: {
+          locationId: toSafeNumber(operatorLocation.locationId),
+          locationName: toSafeString(operatorLocation.locationName),
+          initial: toSafeString(operatorLocation.initial),
+          longtitude: toSafeNumber(operatorLocation.longtitude),
+          latitude: toSafeNumber(operatorLocation.latitude),
+          type: toSafeString(operatorLocation.type),
+        },
+      },
+      device: {
+        deviceId: toSafeNumber(device.deviceId ?? move.deviceId),
+        deviceName: toSafeString(device.deviceName),
+        location: {
+          locationId: toSafeNumber(deviceLocation.locationId),
+          locationName: toSafeString(deviceLocation.locationName),
+          initial: toSafeString(deviceLocation.initial),
+          longtitude: toSafeNumber(deviceLocation.longtitude),
+          latitude: toSafeNumber(deviceLocation.latitude),
+          type: toSafeString(deviceLocation.type),
+        },
+      },
+      epc: {
+        epcCode: toSafeString(epc.epcCode ?? move.epcCode),
+        company: {
+          epcCompany: toSafeNumber(company.epcCompany),
+          companyName: toSafeString(company.companyName),
+        },
+        product: {
+          epcProduct: toSafeNumber(product.epcProduct),
+          productName: toSafeString(product.productName),
+          company: {
+            epcCompany: toSafeNumber(productCompany.epcCompany),
+            companyName: toSafeString(productCompany.companyName),
+          },
+        },
+        epcSerial: toSafeNumber(epc.epcSerial),
+        lot: {
+          epcLot: toSafeNumber(lot.epcLot),
+          lotName: lot.lotName == null ? null : toSafeString(lot.lotName),
+        },
+        manufactureDate: toSafeString(epc.manufactureDate),
+        expiryDate: toSafeString(epc.expiryDate),
+      },
+    },
+  };
+}
+
 function buildFilterMaps(data: any): FilterMaps {
   const toMap = (list: FilterItem[]): Map<number, string> => {
     const m = new Map<number, string>();
@@ -143,11 +270,16 @@ export default function AnomalyReportsPage() {
       });
       if (!res.ok) throw new Error(`서버 오류: HTTP ${res.status}`);
       const data = await res.json();
-      setReports(data.content);
+      const content = Array.isArray(data?.content) ? data.content : [];
+      setReports(content.map((report: unknown) => normalizeAnomalyReport(report)));
       setPageInfo({
-        totalElements: data.totalElements, totalPages: data.totalPages,
-        number: data.number, size: data.size,
-        first: data.first, last: data.last, numberOfElements: data.numberOfElements,
+        totalElements: toSafeNumber(data?.totalElements, content.length),
+        totalPages: Math.max(1, toSafeNumber(data?.totalPages, 1)),
+        number: toSafeNumber(data?.number, pageNum),
+        size: toSafeNumber(data?.size, content.length),
+        first: Boolean(data?.first ?? pageNum === 0),
+        last: Boolean(data?.last ?? true),
+        numberOfElements: toSafeNumber(data?.numberOfElements, content.length),
       });
     } catch (e: any) {
       setError(e.message || "데이터를 불러오는 중 오류가 발생했습니다.");
@@ -205,6 +337,12 @@ export default function AnomalyReportsPage() {
     setSaving(true);
     setSaveError(null);
     setSaveOk(false);
+    const logisMoveId = toSafeNumber(selectedReport.logisMove?.id, NaN);
+    if (!Number.isFinite(logisMoveId) || logisMoveId <= 0) {
+      setSaveError("원본 물류 이벤트 정보가 없어 저장할 수 없습니다.");
+      setSaving(false);
+      return;
+    }
 
     try {
       const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
@@ -212,7 +350,7 @@ export default function AnomalyReportsPage() {
         method: "PUT",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          logisMoveId: selectedReport.logisMove.id,
+          logisMoveId,
           detail:      editDetail,
           result:      editResult,
           reportDate:  selectedReport.reportDate,
@@ -231,7 +369,7 @@ export default function AnomalyReportsPage() {
 
       try {
         const data = await res.json();
-        if (data?.id && data?.logisMove?.id) updated = data;
+        if (data?.id && data?.logisMove?.id) updated = normalizeAnomalyReport(data);
       } catch { /* no body */ }
 
       setSelectedReport(updated);

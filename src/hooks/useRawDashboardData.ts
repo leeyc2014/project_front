@@ -59,6 +59,13 @@ export function useRawDashboardData(
     };
     const base = {
       epcCode: safe(raw.epcCode || raw.epc_code),
+      productId: safe(
+        raw.productId ??
+        raw.product_id ??
+        raw.epcProductId ??
+        raw.epc_product_id ??
+        raw.product?.id
+      ),
       locationId: safe(raw.locationId || raw.location_id || ''),
       eventType: safe(raw.eventType || raw.event_type || ''),
       operatorId: safe(raw.operatorId || raw.operator_id || ''),
@@ -78,6 +85,13 @@ export function useRawDashboardData(
       return raw.details.map((detail: any, index: number) => ({
         id: safe(raw.id || raw.logisLogId || `${base.epcCode}-${detail?.epcSerial ?? 'unknown'}-${index}`),
         logisMoveId: resolveLogisMoveId(detail),
+        productId: safe(
+          detail?.productId ??
+          detail?.product_id ??
+          detail?.epcProductId ??
+          detail?.epc_product_id ??
+          base.productId
+        ),
         epcCode: base.epcCode,
         scanLocation: safe(detail?.locationName || detail?.scanLocation || ''),
         locationId: safe(detail?.locationId || detail?.location_id || base.locationId),
@@ -104,6 +118,7 @@ export function useRawDashboardData(
     return [{
       id: safe(raw.id || raw.logisLogId || `${base.epcCode}-${base.eventTime}`),
       logisMoveId: resolveLogisMoveId(),
+      productId: base.productId,
       epcCode: base.epcCode,
       scanLocation: safe(raw.scanLocation || raw.locationName || raw.location_id || raw.locationId),
       locationId: base.locationId,
