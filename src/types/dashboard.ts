@@ -47,7 +47,7 @@ export interface KPIResponse {
   unregisteredEpc: number;
   integrityErrorEpc: number;
   clonedEpc: number;
-  duplicateEpc: number;
+  redundantEpc: number;
   invalidHubMove: number;
   impossibleSpeed: number;
 }

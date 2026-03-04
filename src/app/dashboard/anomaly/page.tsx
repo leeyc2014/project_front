@@ -38,6 +38,17 @@ function toNullableString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function normalizePageIndex(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
+}
+
+function clampPageIndex(page: number, totalPages: number): number {
+  const safeTotalPages = Math.max(1, Math.floor(Number.isFinite(totalPages) ? totalPages : 1));
+  const safePage = normalizePageIndex(page);
+  return Math.min(safePage, safeTotalPages - 1);
+}
+
 function normalizeAnomalyReport(raw: unknown): AnomalyReport {
   const report = raw && typeof raw === "object" ? (raw as Record<string, any>) : {};
   const move = report.logisMove && typeof report.logisMove === "object"
@@ -264,23 +275,31 @@ export default function AnomalyReportsPage() {
     setLoading(true);
     setError(null);
     try {
+      const requestedPage = normalizePageIndex(pageNum);
       const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
-      const res = await fetch(`${base}/api/v1/anomaly-reports?page=${pageNum}`, {
+      const res = await fetch(`${base}/api/v1/anomaly-reports?page=${requestedPage}`, {
         headers: authHeaders(),
       });
       if (!res.ok) throw new Error(`서버 오류: HTTP ${res.status}`);
       const data = await res.json();
       const content = Array.isArray(data?.content) ? data.content : [];
+      const safeTotalPages = Math.max(1, toSafeNumber(data?.totalPages, 1));
+      const correctedPage = clampPageIndex(requestedPage, safeTotalPages);
+
       setReports(content.map((report: unknown) => normalizeAnomalyReport(report)));
       setPageInfo({
         totalElements: toSafeNumber(data?.totalElements, content.length),
-        totalPages: Math.max(1, toSafeNumber(data?.totalPages, 1)),
-        number: toSafeNumber(data?.number, pageNum),
+        totalPages: safeTotalPages,
+        number: correctedPage,
         size: toSafeNumber(data?.size, content.length),
-        first: Boolean(data?.first ?? pageNum === 0),
-        last: Boolean(data?.last ?? true),
+        first: Boolean(data?.first ?? correctedPage === 0),
+        last: Boolean(data?.last ?? correctedPage >= safeTotalPages - 1),
         numberOfElements: toSafeNumber(data?.numberOfElements, content.length),
       });
+
+      if (correctedPage !== pageNum) {
+        setPage(correctedPage);
+      }
     } catch (e: any) {
       setError(e.message || "데이터를 불러오는 중 오류가 발생했습니다.");
     } finally {
@@ -392,20 +411,21 @@ export default function AnomalyReportsPage() {
     );
   }
 
-  const totalPages = pageInfo?.totalPages ?? 1;
+  const totalPages = Math.max(1, pageInfo?.totalPages ?? 1);
+  const safeCurrentPage = clampPageIndex(page, totalPages);
 
   /* 페이지 버튼 */
   const renderPageButtons = () => {
     if (totalPages <= 1) return null;
     const maxBtn = 5;
-    let start = Math.max(0, page - Math.floor(maxBtn / 2));
+    let start = Math.max(0, safeCurrentPage - Math.floor(maxBtn / 2));
     const end = Math.min(totalPages - 1, start + maxBtn - 1);
     if (end - start < maxBtn - 1) start = Math.max(0, end - maxBtn + 1);
     return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((i) => (
       <button
-        key={i} onClick={() => setPage(i)}
+        key={i} onClick={() => setPage(clampPageIndex(i, totalPages))}
         className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
-          i === page
+          i === safeCurrentPage
             ? "bg-blue-600 text-white shadow-md"
             : "bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white border border-gray-700"
         }`}
@@ -536,7 +556,7 @@ export default function AnomalyReportsPage() {
           <div className="flex items-center justify-center gap-2 mt-6">
             {[
               { label: "«", action: () => setPage(0),              disabled: pageInfo.first },
-              { label: "‹", action: () => setPage((p) => p - 1),   disabled: pageInfo.first },
+              { label: "‹", action: () => setPage((p) => clampPageIndex(p - 1, totalPages)),   disabled: pageInfo.first },
             ].map(({ label, action, disabled }) => (
               <button key={label} onClick={action} disabled={disabled}
                 className="px-3 py-2 bg-gray-800 text-gray-400 rounded-lg text-xs font-bold hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 transition-all"
@@ -544,8 +564,8 @@ export default function AnomalyReportsPage() {
             ))}
             {renderPageButtons()}
             {[
-              { label: "›", action: () => setPage((p) => p + 1),   disabled: pageInfo.last },
-              { label: "»", action: () => setPage(totalPages - 1),  disabled: pageInfo.last },
+              { label: "›", action: () => setPage((p) => clampPageIndex(p + 1, totalPages)),   disabled: pageInfo.last },
+              { label: "»", action: () => setPage(clampPageIndex(totalPages - 1, totalPages)),  disabled: pageInfo.last },
             ].map(({ label, action, disabled }) => (
               <button key={label} onClick={action} disabled={disabled}
                 className="px-3 py-2 bg-gray-800 text-gray-400 rounded-lg text-xs font-bold hover:bg-gray-700 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed border border-gray-700 transition-all"
