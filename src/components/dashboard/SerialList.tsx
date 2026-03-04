@@ -280,12 +280,13 @@ const SerialList: React.FC<SerialListProps> = ({
             const lot = first?.epcLot ?? '-';
             const epcSerial = first?.epcSerial ?? '-';
             const label = `${productName}(LOT: ${lot}, SERIAL: ${epcSerial})`;
-            const statusLabel =
-              first?.st === 'DANGER'
-                ? 'DANGER'
-                : first?.st === 'CAUTION'
-                  ? 'CAUTION'
-                  : 'SAFE';
+            const hasDanger = items.some(
+              (event) => event?.status === 'DANGER' || Boolean((event?.ruleCheck || '').trim())
+            );
+            const hasCaution = items.some(
+              (event) => event?.status === 'CAUTION' || Boolean((event?.aiCheck || '').trim())
+            );
+            const statusLabel = hasDanger ? 'DANGER' : hasCaution ? 'CAUTION' : 'SAFE';
             const statusClass =
               statusLabel === 'DANGER'
                 ? 'text-red-300'

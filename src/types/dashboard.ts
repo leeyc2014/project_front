@@ -29,7 +29,7 @@ export interface RiskItem {
   manufactureDate: string;
   expiryDate: string;
   detailIndex?: number;
-  st: 'DANGER' | 'CAUTION' | 'SAFE';
+  status: 'DANGER' | 'CAUTION' | 'SAFE';
   msg?: string;
   aiCheck?: string;
   ruleCheck?: string;

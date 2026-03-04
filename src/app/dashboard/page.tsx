@@ -169,44 +169,6 @@ export default function DashboardPage() {
     });
   }, [backendEvents]);
 
-  const filteredEvents = useMemo(() => {
-    const normalizeDate = (value: string) => (value || '').slice(0, 10);
-    const locationFilters = [
-      ...(filters.factoryLocationTypes || []),
-      ...(filters.warehouseLocationTypes || []),
-      ...(filters.logisticCenterLocationTypes || []),
-      ...(filters.salerLocationTypes || []),
-      ...(filters.retailerLocationTypes || []),
-    ];
-    const locationFilterSet = new Set(locationFilters);
-    const operatorSet = new Set(filters.operatorIds || []);
-    const deviceSet = new Set(filters.deviceIds || []);
-    const companySet = new Set(filters.epcCompanies || []);
-    const productSet = new Set(filters.epcProducts || []);
-    const epcCodeKeyword = (filters.epcCode || '').toLowerCase();
-
-    return mergedEvents.filter((e) => {
-      if (locationFilterSet.size > 0 && e.locationId && !locationFilterSet.has(e.locationId)) return false;
-      if (operatorSet.size > 0 && e.operatorId && !operatorSet.has(e.operatorId)) return false;
-      if (deviceSet.size > 0 && e.deviceId && !deviceSet.has(e.deviceId)) return false;
-      if (companySet.size > 0 && e.epcCompany && !companySet.has(e.epcCompany)) return false;
-      if (productSet.size > 0) {
-        const productId = String(e.productId ?? '').trim();
-        if (!productId || !productSet.has(productId)) return false;
-      }
-      if (status !== 'ALL' && e.st !== status) return false;
-      if (epcCodeKeyword && !e.epcCode.toLowerCase().includes(epcCodeKeyword)) return false;
-      if (filters.epcLot != null && e.epcLot !== filters.epcLot) return false;
-      if (filters.epcSerial != null && e.epcSerial !== filters.epcSerial) return false;
-      const eventDate = normalizeDate(e.eventTime);
-      if (filters.eventTimeStart && eventDate && eventDate < normalizeDate(filters.eventTimeStart)) return false;
-      if (filters.eventTimeEnd && eventDate && eventDate > normalizeDate(filters.eventTimeEnd)) return false;
-      if (filters.manufactureDate && normalizeDate(e.manufactureDate) !== normalizeDate(filters.manufactureDate)) return false;
-      if (filters.expiryDate && normalizeDate(e.expiryDate) !== normalizeDate(filters.expiryDate)) return false;
-      return true;
-    });
-  }, [mergedEvents, filters, status]);
-
   const [activeSerial, setActiveSerial] = useState<string | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -452,12 +414,12 @@ export default function DashboardPage() {
 
   const serials = useMemo(() => {
     const selected = new Set<string>();
-    filteredEvents.forEach((event) => {
+    mergedEvents.forEach((event) => {
       const key = event.epcCode || 'UNKNOWN';
       selected.add(key);
     });
     return Array.from(selected).sort();
-  }, [filteredEvents]);
+  }, [mergedEvents]);
 
   const autoFocusSerialKey = useMemo(() => {
     if (timelineAutoZoomNonce <= 0) return null;
@@ -484,7 +446,7 @@ export default function DashboardPage() {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', String(Math.max(0, nextPage)));
     params.delete('size');
-    params.delete('st');
+    params.delete('status');
     router.push(`/dashboard?${params.toString()}`);
   }, [router, searchParams]);
 
@@ -636,7 +598,7 @@ export default function DashboardPage() {
 
     params.set('page', '0');
     params.delete('size');
-    params.delete('st');
+    params.delete('status');
     if (status !== 'ALL') {
       params.set('status', status);
     } else {
@@ -677,7 +639,7 @@ export default function DashboardPage() {
     params.set('page', '0');
     params.delete('size');
     //params.delete('status');
-    params.delete('st');
+    params.delete('status');
 
     //setTimelineOpen(false);
     setResetToken((prev) => prev + 1);
@@ -718,7 +680,7 @@ export default function DashboardPage() {
       setOrDelete('eventTimeEnd', nextEnd || '');
       params.set('page', '0');
       params.delete('size');
-      params.delete('st');
+      params.delete('status');
 
       setResetToken((prev) => prev + 1);
       router.push(`/dashboard?${params.toString()}`);

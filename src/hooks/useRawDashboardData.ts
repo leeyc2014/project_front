@@ -50,13 +50,38 @@ export function useRawDashboardData(
         raw.logisMove?.id ??
         raw.id
       );
-    const toStatus = (value: any): RiskItem['st'] => {
+    const parseStatus = (value: any): RiskItem['st'] | null => {
       const rawValue = safe(value).toUpperCase();
       if (rawValue === 'DANGER') return 'DANGER';
       if (rawValue === 'CAUTION') return 'CAUTION';
       if (rawValue === 'SAFE') return 'SAFE';
-      return 'SAFE';
+      return null;
     };
+    const hasRule = (value: any) => safe(value).length > 0;
+    const hasAi = (value: any) => safe(value).length > 0;
+    const inferCollectionStatus = (details: any[] | undefined): RiskItem['st'] => {
+      if (!Array.isArray(details) || details.length === 0) return 'SAFE';
+      let severity: RiskItem['st'] = 'SAFE';
+      for (const detail of details) {
+        if (hasRule(detail?.ruleCheck ?? detail?.rule_check)) return 'DANGER';
+        if (hasAi(detail?.aiCheck ?? detail?.ai_check)) severity = 'CAUTION';
+      }
+      return severity;
+    };
+    const inferItemStatus = (item: any, fallback: RiskItem['st']): RiskItem['st'] => {
+      const parsed = parseStatus(item?.checkResult ?? item?.st ?? item?.status);
+      if (parsed) return parsed;
+      if (hasRule(item?.ruleCheck ?? item?.rule_check)) return 'DANGER';
+      if (hasAi(item?.aiCheck ?? item?.ai_check)) return 'CAUTION';
+      return fallback;
+    };
+    const baseStatus =
+      parseStatus(raw.checkResult ?? raw.st ?? raw.status) ??
+      (hasRule(raw.ruleCheck ?? raw.rule_check)
+        ? 'DANGER'
+        : hasAi(raw.aiCheck ?? raw.ai_check)
+          ? 'CAUTION'
+          : inferCollectionStatus(raw.details));
     const base = {
       epcCode: safe(raw.epcCode || raw.epc_code),
       productId: safe(
@@ -77,7 +102,7 @@ export function useRawDashboardData(
       eventTime: safe(raw.eventTime || raw.event_time || ''),
       manufactureDate: safe(raw.manufactureDate || raw.manufacture_date || raw.epc_manufacture || ''),
       expiryDate: safe(raw.expiryDate || raw.expiry_date || ''),
-      st: toStatus(raw.checkResult ?? raw.st ?? raw.status),
+      st: baseStatus,
       path: Array.isArray(raw.path) ? raw.path : [],
     };
 
@@ -108,7 +133,7 @@ export function useRawDashboardData(
         manufactureDate: base.manufactureDate,
         expiryDate: base.expiryDate,
         detailIndex: index,
-        st: base.st,
+        st: inferItemStatus(detail, base.st),
         aiCheck: safe(detail?.aiCheck ?? detail?.ai_check),
         ruleCheck: safe(detail?.ruleCheck ?? detail?.rule_check),
         path: base.path,
@@ -134,7 +159,7 @@ export function useRawDashboardData(
       eventTime: base.eventTime,
       manufactureDate: base.manufactureDate,
       expiryDate: base.expiryDate,
-      st: base.st,
+      st: inferItemStatus(raw, base.st),
       aiCheck: safe(raw.aiCheck ?? raw.ai_check),
       ruleCheck: safe(raw.ruleCheck ?? raw.rule_check),
       path: base.path,
