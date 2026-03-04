@@ -446,9 +446,14 @@ export default function DashboardPage() {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', String(Math.max(0, nextPage)));
     params.delete('size');
-    params.delete('status');
+    params.delete('st');
+    if (status === 'ALL') {
+      params.delete('status');
+    } else {
+      params.set('status', status);
+    }
     router.push(`/dashboard?${params.toString()}`);
-  }, [router, searchParams]);
+  }, [router, searchParams, status]);
 
   const handleStatusChange = useCallback((nextStatus: 'ALL' | 'SAFE' | 'CAUTION' | 'DANGER') => {
     setTimelineOpen(false);
