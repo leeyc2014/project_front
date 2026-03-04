@@ -50,7 +50,7 @@ export function useRawDashboardData(
         raw.logisMove?.id ??
         raw.id
       );
-    const parseStatus = (value: any): RiskItem['st'] | null => {
+    const parseStatus = (value: any): RiskItem['status'] | null => {
       const rawValue = safe(value).toUpperCase();
       if (rawValue === 'DANGER') return 'DANGER';
       if (rawValue === 'CAUTION') return 'CAUTION';
@@ -59,24 +59,24 @@ export function useRawDashboardData(
     };
     const hasRule = (value: any) => safe(value).length > 0;
     const hasAi = (value: any) => safe(value).length > 0;
-    const inferCollectionStatus = (details: any[] | undefined): RiskItem['st'] => {
+    const inferCollectionStatus = (details: any[] | undefined): RiskItem['status'] => {
       if (!Array.isArray(details) || details.length === 0) return 'SAFE';
-      let severity: RiskItem['st'] = 'SAFE';
+      let severity: RiskItem['status'] = 'SAFE';
       for (const detail of details) {
         if (hasRule(detail?.ruleCheck ?? detail?.rule_check)) return 'DANGER';
         if (hasAi(detail?.aiCheck ?? detail?.ai_check)) severity = 'CAUTION';
       }
       return severity;
     };
-    const inferItemStatus = (item: any, fallback: RiskItem['st']): RiskItem['st'] => {
-      const parsed = parseStatus(item?.checkResult ?? item?.st ?? item?.status);
+    const inferItemStatus = (item: any, fallback: RiskItem['status']): RiskItem['status'] => {
+      const parsed = parseStatus(item?.checkResult ?? item?.status ?? item?.status);
       if (parsed) return parsed;
       if (hasRule(item?.ruleCheck ?? item?.rule_check)) return 'DANGER';
       if (hasAi(item?.aiCheck ?? item?.ai_check)) return 'CAUTION';
       return fallback;
     };
     const baseStatus =
-      parseStatus(raw.checkResult ?? raw.st ?? raw.status) ??
+      parseStatus(raw.checkResult ?? raw.status ?? raw.status) ??
       (hasRule(raw.ruleCheck ?? raw.rule_check)
         ? 'DANGER'
         : hasAi(raw.aiCheck ?? raw.ai_check)
@@ -102,7 +102,7 @@ export function useRawDashboardData(
       eventTime: safe(raw.eventTime || raw.event_time || ''),
       manufactureDate: safe(raw.manufactureDate || raw.manufacture_date || raw.epc_manufacture || ''),
       expiryDate: safe(raw.expiryDate || raw.expiry_date || ''),
-      st: baseStatus,
+      status: baseStatus,
       path: Array.isArray(raw.path) ? raw.path : [],
     };
 
@@ -133,7 +133,7 @@ export function useRawDashboardData(
         manufactureDate: base.manufactureDate,
         expiryDate: base.expiryDate,
         detailIndex: index,
-        st: inferItemStatus(detail, base.st),
+        status: inferItemStatus(detail, base.status),
         aiCheck: safe(detail?.aiCheck ?? detail?.ai_check),
         ruleCheck: safe(detail?.ruleCheck ?? detail?.rule_check),
         path: base.path,
@@ -159,7 +159,7 @@ export function useRawDashboardData(
       eventTime: base.eventTime,
       manufactureDate: base.manufactureDate,
       expiryDate: base.expiryDate,
-      st: inferItemStatus(raw, base.st),
+      status: inferItemStatus(raw, base.status),
       aiCheck: safe(raw.aiCheck ?? raw.ai_check),
       ruleCheck: safe(raw.ruleCheck ?? raw.rule_check),
       path: base.path,
