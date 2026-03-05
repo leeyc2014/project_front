@@ -16,6 +16,13 @@ function enabledLabel(enabled: boolean): string {
   return enabled ? "활성화" : "비활성화";
 }
 
+function roleLabel(role: string): string {
+  const normalized = String(role ?? "").trim().toUpperCase();
+  if (normalized === "ADMIN") return "실무자";
+  if (normalized === "USER") return "검토자";
+  return role || "-";
+}
+
 export default function MembersPage() {
   const router = useRouter();
   const [loginUser] = useAtom<User | null>(loginUserAtom);
@@ -291,7 +298,7 @@ export default function MembersPage() {
                       <td className="px-4 py-3 text-white font-semibold">{member.name}</td>
                       <td className="px-4 py-3 text-center">
                         <span className="inline-block bg-blue-900/50 text-blue-300 text-[12px] font-bold px-2.5 py-1 rounded-lg border border-blue-700/50">
-                          {member.role}
+                          {roleLabel(member.role)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -425,7 +432,7 @@ export default function MembersPage() {
                         onChange={() => setEditForm((prev) => ({ ...prev, role }))}
                         className="accent-blue-500"
                       />
-                      {role}
+                      {roleLabel(role)}
                     </label>
                   ))}
                 </div>
@@ -553,7 +560,7 @@ export default function MembersPage() {
                         onChange={() => setCreateForm((prev) => ({ ...prev, role }))}
                         className="accent-blue-500"
                       />
-                      {role}
+                      {roleLabel(role)}
                     </label>
                   ))}
                 </div>
