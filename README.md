@@ -1,216 +1,118 @@
-﻿# 서비스 기능 명세 (Functional Specification)
+﻿# LOGIFLOW Frontend
 
-이 프로젝트는 EPCIS 기반 물류 로그를 업로드/분석하고 리스크 리포트를 생성하는 **공급망 이상 징후 모니터링 대시보드**입니다.  
-핵심 기능은 **로그 업로드 → 리스크 분류 → 대시보드 시각화 → PDF 리포트 생성** 흐름으로 구성됩니다.
+2차원 바코드 기반 물류 공급망 불법 유통 분석 웹 서비스 프론트엔드입니다.  
+로그인 이후 대시보드 모니터링, 이상 징후 보고서 처리, 진단 보고서 출력, 회원/바코드 관리, 업로드 분석까지 한 흐름으로 사용합니다.
 
----
+## 시연 영상
+- YouTube: https://youtu.be/TZ-cmNFeZpk
 
-## 1) 서비스 개요
-- **목적**: EPCIS 이벤트 로그를 수집하여 위험 상태(DANGER/CAUTION/SAFE)를 분류하고, 대시보드에서 실시간 추이/상세 추적 정보를 제공.
-- **핵심 사용자**: 물류/공급망 운영자, 리스크 관리자, 품질/감사 담당자.
-- **주요 가치**: 이상 징후 탐지, 리스크 아이템 추적, 자동 리포트 생성(PDF).
+## 주요 기능 (필수 7개)
+1. 로그인 (`/`)
+- ID/비밀번호 로그인
+- 백엔드 `/login` 연동
+- 성공 시 토큰 저장 후 대시보드 이동
 
----
+2. 대시보드 (`/dashboard`)
+- 지도 기반 물류 이동 시각화 (MapLibre + Deck.gl)
+- KPI/허브/이벤트 타입 차트 조회
+- 고급 필터(거점/운영자/디바이스/회사/제품/날짜/EPC 등)
+- 시리얼별 타임라인 및 상세 조회
 
-## 2) 사용자 플로우
-1. **로그인 페이지** 접속 (`/`)
-2. **로그 데이터 업로드** (`/dashboard/report/upload`)
-3. **대시보드 분석** (`/dashboard`)
-4. **리스크 리포트 생성** (`/dashboard/report/generate`)
+3. 이상 징후 리포트 (`/dashboard/anomaly`)
+- 이상 징후 보고서 목록/페이징 조회
+- 상세 모달 확인, 결과/상세/완료 여부 수정
+- 상태 코드 및 메타 데이터 정규화 처리
 
----
+4. 진단 보고서 (`/dashboard/report`, `/print`)
+- 기간(주간/월간) 기반 보고 구간 자동 생성
+- 제품 선택 후 보고서 미리보기
+- `/print` 페이지에서 인쇄용 진단 보고서 출력
 
-## 3) 화면/라우트 상세
+5. 회원 관리 (`/dashboard/members`)
+- 관리자 전용 메뉴
+- 회원 목록 조회, 등록, 수정(권한/활성 여부 포함)
+- 내 계정 수정과 타 계정 수정 분기 처리
 
-### A. 로그인 (`/`)
-- 사용자 ID/비밀번호 입력 폼
-- 로그인 성공 시 `/dashboard`로 이동
-- 소셜 로그인 버튼 제공 (Google/Naver/Kakao/GitHub)
-- 비밀번호 찾기 링크(`/find`) 제공
-- **주의**: 실제 로그인 API(`/api/login`)는 코드에 정의되지 않음(미구현)
+6. 바코드 관리 (`/dashboard/manage`)
+- 관리자 전용 메뉴
+- EPC 목록 조회/상세/페이징
+- EPC 신규 등록(회사/제품/LOT/시리얼/제조일/유통기한)
+- 선택 EPC QR 코드 렌더링
 
-### B. 비밀번호 찾기 (`/find`)
-- **아이디 존재 여부 확인 단계** → **비밀번호 변경 단계**의 2단계 흐름
-- 아이디 검증은 `userid === 'admin'` 조건으로 더미 처리
-- 비밀번호 변경 조건:
-  - 신규 비밀번호/확인 비밀번호 일치
-  - 최소 6자 이상
-- 변경 성공 시 로그인 페이지(`/`)로 이동
-- **주의**: 실제 서버 연동 없이 클라이언트 로컬 흐름으로만 구현
+7. 업로드 (`대시보드 헤더 업로드 위젯`)
+- 관리자 전용 CSV 업로드 분석
+- `/api/v1/logistics/upload` 스트리밍 응답 기반 진행률/로그 표시
+- 이상 항목 요약(위험/주의/복제/중복/무결성/미등록 등) 제공
+- 업로드 완료 시 대시보드 데이터 자동 갱신 트리거
 
-### C. 대시보드 레이아웃 (`/dashboard`, `/dashboard/*`)
-공통 상단 네비게이션 및 서브메뉴 제공
-- 메인 메뉴: **대시보드 / 진단 리포트**
-- 서브메뉴:
-  - 대시보드: 종합 현황, 실시간 감시(placeholder), 위험 이력 분석(placeholder)
-  - 리포트: 리포트 생성, 로그 업로드
-- 사용자 정보 표시 및 로그아웃 아이콘(실제 동작 미구현)
+## 라우트 요약
+- `/` : 로그인
+- `/dashboard` : 통합 대시보드
+- `/dashboard/anomaly` : 이상 징후 보고서
+- `/dashboard/report` : 진단 보고서 기간 생성
+- `/dashboard/members` : 회원 관리 (관리자)
+- `/dashboard/manage` : 바코드 관리 (관리자)
+- `/print` : 인쇄용 진단 보고서
 
-### D. 대시보드 메인 (`/dashboard`)
-**EPCIS 이벤트 데이터 기반 종합 현황**
+## 실행 방법
+### 1) 사전 요구사항
+- Node.js `>= 20.9.0`
+- npm `>= 9`
+- 실행 중인 백엔드 서버
 
-#### 1) KPI 카드
-- ALL, SAFE, CAUTION, DANGER 상태별 개수 표시
-- 카드 클릭 시 필터 변경
+### 2) 환경변수 설정
+루트에 `.env.local` 파일을 만들고 백엔드 주소를 설정합니다.
 
-#### 2) 실시간 추이 차트
-- 상태별 데이터 흐름을 영역 차트(ApexCharts)로 시각화
-- 실데이터 기반은 아니며, 상태별 개수로 더미 시계열 생성
-
-#### 3) 최근 활동 리스트
-- 최신 10건 표시
-- EPC Code, Location, Status 표시
-- 클릭 시 상세 모달 오픈
-
-#### 4) 전체 리스트 모달
-- 모든 이벤트 목록 표시
-- 상태 필터(ALL/SAFE/CAUTION/DANGER)
-- 검색 (EPC Code, Location)
-- 상세 보기 버튼 제공
-
-#### 5) 상세 모달 (트레이서빌리티 리포트)
-- EPC 식별자 및 이벤트 상세 정보 표시
-- AI 분석 메시지 (상태에 따라 문구 변경)
-- **지도 표시**: Kakao Map 기반 이동 경로 또는 위치 표시
-
----
-
-### E. 로그 업로드 (`/dashboard/report/upload`)
-**CSV/TSV 파일 업로드 → 이벤트 데이터 저장**
-
-#### 1) 업로드 방식
-- 클릭 업로드
-- 드래그&드롭 업로드
-
-#### 2) 지원 파일 확장자
-- `.csv`, `.txt` (탭 구분 시 TSV로 인식)
-
-#### 3) 파싱 로직
-- 첫 행을 헤더로 사용
-- 지원 헤더:
-  - `scan_location`
-  - `location_id`
-  - `hub_type`
-  - `business_step`
-  - `event_type`
-  - `operator_id`
-  - `device_id`
-  - `epc_code`
-  - `epc_header`
-  - `epc_company`
-  - `epc_product`
-  - `epc_lot`
-  - `event_time`
-  - `manufacture_date`
-  - `expiry_date`
-
-#### 4) 리스크 상태 생성 로직 (더미)
-- 10번째마다 DANGER, 7번째마다 CAUTION, 나머지는 SAFE
-
-#### 5) 업로드 결과
-- `/api/epcis/events`로 POST 전송
-- 성공 시 업로드 완료 화면 → 대시보드로 이동 버튼 제공
-
----
-
-### F. 리포트 생성 (`/dashboard/report/generate`)
-**PDF 리포트 자동 생성 및 히스토리 관리**
-
-#### 1) 리포트 생성
-- `/api/epcis/events`에서 최신 데이터 가져옴
-- DANGER/CAUTION 항목만 리포트에 포함
-- jsPDF + autoTable 사용
-
-#### 2) 리포트 내용
-- 제목, 생성 시간, 위험 항목 수
-- 테이블 컬럼:
-  - Status
-  - EPC Code
-  - Location
-  - Event Time
-  - AI Analysis (DANGER/CAUTION 메시지)
-
-#### 3) 히스토리 저장
-- 로컬 스토리지 `reportHistory`에 기록
-- 생성된 파일명, 날짜, 위험 개수 보관
-- 재다운로드 버튼은 서버 저장 미구현으로 안내 메시지 출력
-
----
-
-## 4) API 명세
-
-### `GET /api/epcis/events`
-- 설명: 저장된 EPCIS 이벤트 목록 반환
-- 응답: `RiskItem[]`
-- 저장소: **메모리 변수 (`epcisEvents`)**  
-  → 서버 재시작 시 데이터 소실
-
-### `POST /api/epcis/events`
-- 설명: 업로드된 로그 데이터 저장
-- 요청 Body: `RiskItem[]`
-- 동작: 기존 데이터를 새 데이터로 **완전히 교체**
-- 응답: `{ message: "Data uploaded successfully" }`
-
----
-
-## 5) 데이터 모델 (RiskItem)
-```
-id: string
-epcCode: string
-scanLocation: string
-locationId: string
-hubType: string
-businessStep: string
-eventType: string
-operatorId: string
-deviceId: string
-epcHeader: string
-epcCompany: string
-epcProduct: string
-epcLot: string
-eventTime: string
-manufactureDate: string
-expiryDate: string
-st: "DANGER" | "CAUTION" | "SAFE"
-msg: string
-location: string
-destination: string
-path: { lat: number, lng: number, isAnomaly?: boolean, desc?: string }[]
+```env
+NEXT_PUBLIC_BACKEND_BASE_URL=http://localhost:8080
 ```
 
----
-
-## 6) 지도 기능 (Kakao Map)
-- `NEXT_PUBLIC_KAKAO_MAP_KEY` 환경변수 필요
-- `path`가 있으면 경로 + 마커 표시
-- `address`만 있으면 지오코딩 후 단일 위치 표시
-- 이상 징후 위치는 빨간색 마커로 표시
-
----
-
-## 7) 기술 스택
-- Next.js 16 (App Router)
-- React 19
-- Tailwind CSS v4
-- ApexCharts (차트)
-- jsPDF + autoTable (PDF)
-- Kakao Maps API
-
----
-
-## 8) 제한 사항 / 미구현 영역
-- `/api/login` 미구현 (로그인 실제 인증 로직 없음)
-- 비밀번호 찾기/변경 서버 연동 없음
-- 로그 데이터는 메모리 저장 → 서버 재시작 시 소실
-- 대시보드 일부 서브메뉴는 placeholder 링크
-- 리포트 재다운로드 기능 미구현 (서버 저장 필요)
-
----
-
-## 9) 실행 방법
+### 3) 의존성 설치
 ```bash
-npm install
+npm ci
+```
+
+### 4) 개발 서버 실행
+```bash
 npm run dev
 ```
 
 브라우저에서 `http://localhost:3000` 접속
+
+### 5) 프로덕션 빌드/실행
+```bash
+npm run build
+npm run start
+```
+
+## 기술 스택
+- Next.js 16 (App Router)
+- React 19
+- TypeScript 5
+- Tailwind CSS v4
+- MapLibre GL + Deck.gl
+- ApexCharts
+- Jotai
+
+## 사용 라이브러리
+### Runtime
+- `next`, `react`, `react-dom`
+- `jotai`
+- `maplibre-gl`
+- `@deck.gl/core`, `@deck.gl/layers`, `@deck.gl/mapbox`, `@deck.gl/geo-layers`
+- `apexcharts`, `react-apexcharts`
+- `qrcode.react`, `react-qr-code`
+- `react-icons`
+- `jspdf`, `jspdf-autotable`
+- `@tanstack/react-virtual`
+
+### Dev
+- `typescript`
+- `eslint`, `eslint-config-next`
+- `tailwindcss`, `@tailwindcss/postcss`
+- `@types/node`, `@types/react`, `@types/react-dom`
+- `babel-plugin-react-compiler`
+
+## 비고
+- 관리자 전용: 이상 징후 리포트, 회원 관리, 바코드 관리, 업로드
+- 백엔드 API 스펙/권한 정책은 서버 구현에 따릅니다.
