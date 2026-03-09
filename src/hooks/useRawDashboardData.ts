@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { FilterOptions, RiskItem, FilterState } from '@/types/dashboard';
 import type { LocationItem } from '@/types/useRawDashboardData';
 import { getAuthToken } from '@/utils/authToken';
+import { getBackendUrl } from '@/utils/apiUtil';
 
 export function useRawDashboardData(
   page?: number,
@@ -26,7 +27,7 @@ export function useRawDashboardData(
   const [locationList, setLocationList] = useState<LocationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+  const backendBaseUrl = getBackendUrl() || '';
 
   const normalizeBackendEvent = useCallback((raw: any): RiskItem[] => {
     const safe = (v: any) => v == null ? '' : String(v).trim();

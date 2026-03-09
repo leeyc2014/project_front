@@ -6,6 +6,7 @@ import { getAuthToken } from "@/utils/authToken";
 import { useState, useEffect, useCallback } from "react";
 import type { AnomalyReport, BadgeColor, FilterItem, FilterMaps, PageInfo } from "@/types/anomalyPage";
 import { LOCATION_TYPE_KO } from "@/constants/anomaly";
+import { getBackendUrl } from "@/utils/apiUtil";
 
 /* ── 코드 → 한글 상수 맵 ────────────────────────────── */
 
@@ -260,7 +261,7 @@ export default function AnomalyReportsPage() {
     if (!isMounted) return;
     (async () => {
       try {
-        const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+        const base = getBackendUrl() || "";
         const res = await fetch(`${base}/api/v1/dashboard/init-data`, { headers: authHeaders() });
         if (!res.ok) return;
         setFilterMaps(buildFilterMaps(await res.json()));
@@ -276,7 +277,7 @@ export default function AnomalyReportsPage() {
     setError(null);
     try {
       const requestedPage = normalizePageIndex(pageNum);
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const res = await fetch(`${base}/api/v1/anomaly-reports?page=${requestedPage}`, {
         headers: authHeaders(),
       });
@@ -364,7 +365,7 @@ export default function AnomalyReportsPage() {
     }
 
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const res = await fetch(`${base}/api/v1/anomaly-reports/${selectedReport.id}`, {
         method: "PUT",
         headers: { ...authHeaders(), "Content-Type": "application/json" },

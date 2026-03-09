@@ -8,6 +8,7 @@ import { FaCloudUploadAlt } from "react-icons/fa";
 import { dashboardReloadTriggerAtom } from "@/atoms/atom";
 import { createPortal } from "react-dom"; 
 import { getAuthToken } from "@/utils/authToken";
+import { getBackendUrl } from "@/utils/apiUtil";
 
 const DEFAULT_FILE_LABEL = "No file selected";
 
@@ -204,7 +205,7 @@ export default function HeaderUploadWidget() {
       return;
     }
 
-    const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+    const backendBaseUrl = getBackendUrl() || "";
     if (!backendBaseUrl) {
       alert("백엔드 URL이 설정되지 않았습니다.");
       setIsProcessing(false);

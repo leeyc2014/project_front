@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import type { PeriodRange, Product, RangeType } from "@/types/reportPage";
 import { getAuthToken } from "@/utils/authToken";
+import { getBackendUrl } from "@/utils/apiUtil";
 
 /* ─── 유틸 ─────────────────────────────────────────── */
 
@@ -83,7 +84,7 @@ export default function PeriodRangePage() {
     // 제품 목록 Fetch
     const fetchProducts = async () => {
       try {
-        const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+        const backendBaseUrl = getBackendUrl() || '';
         const url = `${backendBaseUrl}/api/v1/dashboard/init-data`;
         const token = getAuthToken();
         const authHeaders = { Authorization: `Bearer ${token}` };

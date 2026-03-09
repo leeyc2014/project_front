@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import type { EpcListResponse, EpcPageInfo, EpcRow, InitDataResponse, SelectOption, LotRelation } from "@/types/manage";
 import { getAuthToken } from "@/utils/authToken";
+import { getBackendUrl } from "@/utils/apiUtil";
 
 function toDisplay(value: unknown): string {
   if (value === null || value === undefined) return "-";
@@ -121,7 +122,7 @@ export default function ManagePage() {
     setError(null);
 
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const res = await fetch(`${base}/api/v1/epc?page=${pageNum}`, {
         method: "GET",
         headers: {
@@ -210,7 +211,7 @@ export default function ManagePage() {
     setIsInitLoading(true);
     setCreateError(null);
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const res = await fetch(`${base}/api/v1/dashboard/init-data`, {
         method: "GET",
         headers: {
@@ -348,7 +349,7 @@ export default function ManagePage() {
         return;
       }
 
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const payload = {
         epcCompany,
         epcProduct,

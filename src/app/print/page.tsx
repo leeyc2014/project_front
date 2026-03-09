@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { convertMessage } from "@/utils/aiMessageUtil";
 import { getAuthToken } from "@/utils/authToken";
 import { EVENT_TYPE_LABELS } from "@/constants/eventType";
+import { getBackendUrl } from "@/utils/apiUtil";
 
 // 유형별 진단 레이블 상수
 const STATUS_LABELS: Record<string, string> = {
@@ -67,7 +68,7 @@ function PrintReportContent() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+        const backendBaseUrl = getBackendUrl() || '';
         const token = getAuthToken();
         const authHeaders = { Authorization: `Bearer ${token}` };
 
