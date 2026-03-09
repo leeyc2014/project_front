@@ -4,7 +4,7 @@
 로그인 이후 대시보드 모니터링, 이상 징후 보고서 처리, 진단 보고서 출력, 회원/바코드 관리, 업로드 분석까지 한 흐름으로 사용합니다.
 
 ## 시연 영상
-- YouTube: https://youtu.be/TZ-cmNFeZpk
+[![LOGIFLOW 시연 영상](https://img.youtube.com/vi/TZ-cmNFeZpk/maxresdefault.jpg)](https://youtu.be/TZ-cmNFeZpk)
 
 ## 주요 기능 (필수 7개)
 1. 로그인 (`/`)
