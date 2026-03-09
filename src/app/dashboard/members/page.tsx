@@ -7,6 +7,7 @@ import { loginUserAtom } from "@/atoms/atom";
 import { getAuthToken } from "@/utils/authToken";
 import type { User } from "@/types/user";
 import type { Member, EditForm, CreateForm, MemberListResponse, MemberPageInfo } from "@/types/members";
+import { getBackendUrl } from "@/utils/apiUtil";
 
 function authHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${getAuthToken()}` };
@@ -70,7 +71,7 @@ export default function MembersPage() {
     setLoading(true);
     setError(null);
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const res = await fetch(`${base}/api/v1/member?page=${pageNum}`, {
         method: "GET",
         headers: authHeaders(),
@@ -130,7 +131,7 @@ export default function MembersPage() {
     setSaving(true);
     setError(null);
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const isMyAccount = loginUser?.id === selectedMember.id;
       const payload = isMyAccount
         ? {
@@ -170,7 +171,7 @@ export default function MembersPage() {
     setSaving(true);
     setError(null);
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "";
+      const base = getBackendUrl() || "";
       const payload = {
         id: createForm.id.trim(),
         password: createForm.password,

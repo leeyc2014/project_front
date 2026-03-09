@@ -8,6 +8,7 @@ import { loginUserAtom } from '@/atoms/atom';
 import { EVENT_TYPE_LABELS } from '@/constants/eventType';
 import { getAuthToken } from '@/utils/authToken';
 import type { InspectionFormProps, ReportAnomalyByLocation, SerialListProps } from '@/types/serialList';
+import { getBackendUrl } from '@/utils/apiUtil';
 
 function formatTimestamp6(date: Date): string {
   const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -71,7 +72,7 @@ const InspectionForm: React.FC<InspectionFormProps> = ({
 
     setIsSubmitting(true);
     try {
-      const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+      const backendBaseUrl = getBackendUrl() || '';
       const token = getAuthToken();
       const payload = {
         logisMoveId: selectedMessageObj.logisMoveId,

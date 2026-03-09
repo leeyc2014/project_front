@@ -17,6 +17,7 @@ import type { HubDefectTab } from '@/types/chartSection';
 import { useAtom } from 'jotai';
 import { dashboardReloadTriggerAtom } from '@/atoms/atom';
 import { getAuthToken } from '@/utils/authToken';
+import { getBackendUrl } from '@/utils/apiUtil';
 
 const LogisticsMap = dynamic(() => import('@/components/dashboard/LogisticsMap'), {
   ssr: false,
@@ -191,7 +192,7 @@ export default function DashboardPage() {
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const bottomChartsRef = useRef<HTMLDivElement>(null);
   const timelinePanelRef = useRef<HTMLDivElement>(null);
-  const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+  const backendBaseUrl = getBackendUrl() || '';
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
     const nextFilters: FilterState = {

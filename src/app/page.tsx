@@ -3,6 +3,7 @@
 import { loginUserAtom } from '@/atoms/atom';
 import { DEFAULT_DASHBOARD_QUERY } from '@/constants/defaultDateRange';
 import { User } from '@/types/user';
+import { getBackendUrl } from '@/utils/apiUtil';
 import { useAtom } from 'jotai';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useRef } from "react";
@@ -28,7 +29,7 @@ export default function Page() {
 
   const [, setLoginUser] = useAtom<User | null>(loginUserAtom);
 
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || '';
+  const backendUrl = getBackendUrl() || '';
   const setTokenCookie = (token: string) => {
     const secure = typeof window !== 'undefined' && window.location.protocol == 'https:' ? '; Secure' : '';
     document.cookie = `token=${encodeURIComponent(token)}; Path=/; SameSite=Lax${secure}`;
